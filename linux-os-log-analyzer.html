@@ -85,7 +85,7 @@ button.secondary { background: #333; color: #eee; }
         <button onclick="downloadCollectScript()" style="background:#00d4ff;border:none;padding:10px 20px;border-radius:6px;color:#000;font-weight:bold;cursor:pointer;">下载收集脚本</button>
       </div>
       <div style="margin-top:10px;font-size:0.85em;color:#888;">
-        脚本将在服务器上收集: 历史日志( journalctl -S -Ndays ) + 实时快照(dmesg/smartctl/ps) + 性能数据(iostat/mpstat)
+        脚本将在服务器上收集日志，输出到: <code style="background:#0f0f23;padding:2px 6px;border-radius:4px;color:#ffa502;">/tmp/system-logs-&lt;hostname&gt;-&lt;时间&gt;.tar.gz</code>
       </div>
     </div>
     <input type="file" id="fileInput" style="display:none" accept=".log,.txt,*">
@@ -445,8 +445,10 @@ function generateScript(days, level) {
   lines.push('trap "rm -rf $TMPDIR 2>/dev/null || true" EXIT');
   lines.push('');
   lines.push('DEST="/tmp/system-logs-$(hostname)-$(date +%Y%m%d_%H%M%S).tar.gz"');
+  lines.push('echo "========================================"');
   lines.push('echo "收集历史: ' + days + '天 | 级别: ' + level + '"');
-  lines.push('echo "临时目录: $TMPDIR"');
+  lines.push('echo "输出文件: $DEST"');
+  lines.push('echo "========================================"');
   lines.push('');
 
   // 基础信息
