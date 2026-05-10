@@ -5,109 +5,433 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Linux OS Log Analyzer</title>
 <style>
+/* === Theme Variables === */
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --info: #58a6ff;
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Theme: Ops Dark (默认) */
+[data-theme="ops"] {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --info: #58a6ff;
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+/* Theme: Tech Blue */
+[data-theme="tech"] {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-input: #0f0f23;
+  --border: #333;
+  --text-primary: #eee;
+  --text-secondary: #888;
+  --text-muted: #666;
+  --accent: #00d4ff;
+  --accent-hover: #00ff88;
+  --success: #2ed573;
+  --warning: #ffa502;
+  --danger: #ff4757;
+  --info: #00d4ff;
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Theme: Light Minimal */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-input: #ffffff;
+  --border: #d0d7de;
+  --text-primary: #24292f;
+  --text-secondary: #57606a;
+  --text-muted: #8c959f;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --info: #0969da;
+  --card-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+/* === Reset & Base === */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
-.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-h1 { text-align: center; color: #00d4ff; margin-bottom: 30px; }
-.input-section { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-.drop-zone { border: 2px dashed #00d4ff; border-radius: 8px; padding: 40px; text-align: center; color: #888; cursor: pointer; transition: all 0.3s; }
-.drop-zone.dragover { background: #0f3460; border-color: #00ff88; color: #00ff88; }
-textarea { width: 100%; height: 200px; background: #0f0f23; border: 1px solid #333; border-radius: 8px; color: #eee; padding: 15px; font-family: 'Monaco', 'Consolas', monospace; font-size: 13px; resize: vertical; }
-textarea:focus { outline: none; border-color: #00d4ff; }
-.btn-row { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
-button { background: #00d4ff; border: none; padding: 10px 20px; border-radius: 6px; color: #000; font-weight: bold; cursor: pointer; }
-button:hover { background: #00ff88; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+/* === Header === */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.header h1 {
+  font-size: 1.5em;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.header h1 span { font-size: 0.5em; color: var(--text-muted); font-weight: 400; }
+
+/* Theme Switcher */
+.theme-switcher {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.theme-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+.theme-btn:hover { color: var(--text-primary); }
+.theme-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* === Cards === */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
+  transition: background 0.3s, border-color 0.3s;
+}
+.card-title {
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* === Drop Zone === */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--bg-tertiary);
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+/* === Textarea === */
+textarea {
+  width: 100%;
+  height: 180px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 14px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+  resize: vertical;
+  margin-top: 12px;
+  transition: border-color 0.2s, background 0.3s;
+}
+textarea:focus { outline: none; border-color: var(--accent); }
+
+/* === Form Elements === */
+select, input[type="text"], input[type="password"] {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.9em;
+  transition: border-color 0.2s;
+}
+select:focus, input:focus { outline: none; border-color: var(--accent); }
+.config-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* === Buttons === */
+.btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+button {
+  background: var(--accent);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+button:hover { filter: brightness(1.1); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.secondary { background: #333; color: #eee; }
-.config-row { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
-.config-row input { flex: 1; background: #0f0f23; border: 1px solid #333; border-radius: 6px; color: #eee; padding: 8px 12px; }
-.config-row select { background: #0f0f23; border: 1px solid #333; border-radius: 6px; color: #eee; padding: 8px 12px; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-.stat-card { background: #16213e; padding: 15px; border-radius: 8px; text-align: center; }
-.stat-card .num { font-size: 2em; font-weight: bold; }
-.stat-card.critical .num { color: #ff4757; }
-.stat-card.warning .num { color: #ffa502; }
-.stat-card.info .num { color: #2ed573; }
-.results { display: grid; gap: 15px; }
-.issue-card { background: #16213e; border-radius: 8px; padding: 15px; border-left: 4px solid; }
-.issue-card.critical { border-color: #ff4757; }
-.issue-card.warning { border-color: #ffa502; }
-.issue-card.info { border-color: #2ed573; }
-.issue-card .header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.issue-card .time { color: #888; font-size: 0.9em; }
-.issue-card .tag { padding: 3px 10px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
-.tag.critical { background: #ff4757; color: #fff; }
-.tag.warning { background: #ffa502; color: #000; }
-.tag.info { background: #2ed573; color: #000; }
-.tag.security { background: #ff6b81; color: #fff; }
-.tag.performance { background: #7bed9f; color: #000; }
-.issue-card .content { color: #ccc; font-size: 0.95em; line-height: 1.5; word-break: break-all; }
-.issue-card .suggestion { margin-top: 10px; padding: 10px; background: #0f3460; border-radius: 4px; color: #00d4ff; font-size: 0.85em; }
-.llm-summary { background: #16213e; border-radius: 12px; padding: 20px; margin-top: 20px; border: 1px solid #00d4ff; }
-.llm-summary h3 { color: #00d4ff; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-.llm-summary .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #00d4ff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+button.secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+button.secondary:hover { background: var(--border); }
+
+/* === Stats Cards === */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 10px;
+  text-align: center;
+}
+.stat-card .num { font-size: 2em; font-weight: 700; line-height: 1.2; }
+.stat-card .label { font-size: 0.8em; color: var(--text-secondary); margin-top: 4px; }
+.stat-card.critical .num { color: var(--danger); }
+.stat-card.warning .num { color: var(--warning); }
+.stat-card.info .num { color: var(--success); }
+
+/* === Issue Cards === */
+.results { display: grid; gap: 12px; }
+.issue-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  border-left: 4px solid;
+}
+.issue-card.critical { border-color: var(--danger); }
+.issue-card.warning { border-color: var(--warning); }
+.issue-card.info { border-color: var(--success); }
+.issue-card .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.issue-card .time { color: var(--text-muted); font-size: 0.85em; }
+.issue-card .tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75em;
+  font-weight: 600;
+}
+.tag.critical { background: var(--danger); color: #fff; }
+.tag.warning { background: var(--warning); color: #000; }
+.tag.info { background: var(--success); color: #fff; }
+.tag.security { background: #f85149; color: #fff; }
+.tag.performance { background: var(--success); color: #fff; }
+.issue-card .content {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.issue-card .suggestion {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+/* === LLM Summary === */
+.llm-summary {
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+.llm-summary h3 {
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1em;
+}
+.llm-summary .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
-.llm-summary pre { background: #0f0f23; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.6; max-height: 400px; overflow-y: auto; }
-.llm-summary.error { border-color: #ff4757; color: #ff4757; }
-.chat-section { background: #16213e; border-radius: 12px; padding: 20px; margin-top: 20px; }
-.chat-section h3 { color: #00d4ff; margin-bottom: 15px; }
-.chat-messages { max-height: 400px; overflow-y: auto; margin-bottom: 15px; }
-.chat-msg { margin-bottom: 12px; padding: 12px; border-radius: 8px; line-height: 1.5; }
-.chat-msg.user { background: #0f3460; text-align: right; }
-.chat-msg.assistant { background: #1a1a2e; border: 1px solid #333; }
-.chat-msg.error { background: #3d1a1a; border: 1px solid #ff4757; color: #ff4757; }
+.llm-summary pre {
+  background: var(--bg-primary);
+  padding: 16px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.9em;
+}
+.llm-summary.error { border-color: var(--danger); }
+.llm-summary.error h3 { color: var(--danger); }
+
+/* === Chat === */
+.chat-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+.chat-section h3 { color: var(--accent); margin-bottom: 16px; font-size: 1em; }
+.chat-messages { max-height: 350px; overflow-y: auto; margin-bottom: 16px; }
+.chat-msg { margin-bottom: 12px; padding: 12px 16px; border-radius: 10px; font-size: 0.9em; }
+.chat-msg.user { background: var(--bg-tertiary); text-align: right; }
+.chat-msg.assistant { background: var(--bg-primary); border: 1px solid var(--border); }
+.chat-msg.error { background: rgba(248,81,73,0.1); border: 1px solid var(--danger); color: var(--danger); }
 .chat-input-row { display: flex; gap: 10px; }
-.chat-input-row textarea { flex: 1; height: 60px; resize: none; }
+.chat-input-row textarea { flex: 1; height: 56px; margin: 0; }
 .chat-msg pre { white-space: pre-wrap; word-break: break-all; margin-top: 8px; font-size: 0.9em; }
-.empty { text-align: center; color: #666; padding: 60px; }
+
+/* === Collect Section === */
+.collect-section { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.collect-section h3 { color: var(--accent); margin-bottom: 14px; font-size: 1em; display: flex; align-items: center; gap: 8px; }
+.collect-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* === Misc === */
+.empty { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 1.1em; }
+.info-text { margin-top: 10px; font-size: 0.85em; color: var(--text-muted); }
+.info-text code {
+  background: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--warning);
+  font-family: 'Monaco', 'Consolas', monospace;
+}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Linux OS Log Analyzer <span style="font-size:0.5em;color:#888;">v0.1rc1</span></h1>
-  <div class="input-section">
-    <div class="drop-zone" id="dropZone">拖拽日志文件到这里，或点击选择文件</div>
-    <div class="collect-section" style="background:#16213e;border-radius:12px;padding:20px;margin-bottom:20px;">
-      <h3 style="color:#00d4ff;margin-bottom:15px;">🔧 生成日志收集脚本</h3>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <select id="historyDays" style="background:#0f0f23;border:1px solid #333;border-radius:6px;color:#eee;padding:8px 12px;">
-          <option value="1">最近 1 天</option>
-          <option value="3">最近 3 天</option>
-          <option value="7" selected>最近 7 天</option>
-          <option value="14">最近 14 天</option>
-          <option value="30">最近 30 天</option>
-        </select>
-        <select id="collectLevel" style="background:#0f0f23;border:1px solid #333;border-radius:6px;color:#eee;padding:8px 12px;">
-          <option value="basic">基础 (系统信息+dmesg)</option>
-          <option value="hardware" selected>硬件 (含 SMART/内存错误)</option>
-          <option value="full">完整 (含性能采样+历史日志)</option>
-        </select>
-        <button onclick="downloadCollectScript()" style="background:#00d4ff;border:none;padding:10px 20px;border-radius:6px;color:#000;font-weight:bold;cursor:pointer;">下载收集脚本</button>
-      </div>
-      <div style="margin-top:10px;font-size:0.85em;color:#888;">
-        脚本将在服务器上收集日志，输出到: <code style="background:#0f0f23;padding:2px 6px;border-radius:4px;color:#ffa502;">/tmp/system-logs-&lt;hostname&gt;-&lt;时间&gt;.tar.gz</code>
-      </div>
+  <div class="header">
+    <h1>Linux OS Log Analyzer <span>v0.1rc1</span></h1>
+    <div class="theme-switcher">
+      <button class="theme-btn active" data-theme="ops">运维深色</button>
+      <button class="theme-btn" data-theme="tech">科技蓝</button>
+      <button class="theme-btn" data-theme="light">简约白</button>
     </div>
-    <input type="file" id="fileInput" style="display:none" accept=".log,.txt,*">
-    <textarea id="logInput" placeholder="粘贴日志内容..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="drop-zone" id="dropZone">拖拽日志文件到这里，或点击选择文件</div>
+    <input type="file" id="fileInput" style="display:none">
+    <textarea id="logInput" placeholder="粘贴日志内容，或上传文件..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔧 生成日志收集脚本</div>
+    <div class="collect-row">
+      <select id="historyDays">
+        <option value="1">最近 1 天</option>
+        <option value="3">最近 3 天</option>
+        <option value="7" selected>最近 7 天</option>
+        <option value="14">最近 14 天</option>
+        <option value="30">最近 30 天</option>
+      </select>
+      <select id="collectLevel">
+        <option value="basic">基础</option>
+        <option value="hardware" selected>硬件</option>
+        <option value="full">完整</option>
+      </select>
+      <button onclick="downloadCollectScript()">下载脚本</button>
+    </div>
+    <div class="info-text">
+      脚本输出: <code>/tmp/system-logs-&lt;hostname&gt;-&lt;时间&gt;.tar.gz</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ LLM 配置</div>
     <div class="config-row">
       <select id="modelSelect">
         <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
         <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
       </select>
-      <input type="password" id="apiKey" placeholder="API Key" style="max-width: 200px;">
-      <input type="text" id="apiUrl" placeholder="https://api.deepseek.com" style="max-width: 280px;">
-      <button class="secondary" onclick="saveConfig()" style="padding: 8px 12px; font-size: 0.85em;">保存</button>
+      <input type="password" id="apiKey" placeholder="API Key" style="max-width: 180px;">
+      <input type="text" id="apiUrl" placeholder="https://api.deepseek.com" style="max-width: 220px;">
+      <button class="secondary" onclick="saveConfig()">保存</button>
     </div>
-    <div style="margin-top:10px; font-size:0.85em; color:#888;">
-      <label><input type="checkbox" id="useLLM" checked style="margin-right:5px;">使用 LLM 分析</label>
-    </div>
-    <div class="btn-row">
-      <button onclick="analyzeLogs()" id="mainBtn">开始分析</button>
-      <button class="secondary" onclick="clearAll()">清空</button>
-      <button class="secondary" onclick="exportReport()">导出报告</button>
+    <div class="config-row" style="margin-top:8px;">
+      <label style="color:var(--text-secondary);font-size:0.9em;cursor:pointer;">
+        <input type="checkbox" id="useLLM" checked style="margin-right:6px;">使用 LLM 分析
+      </label>
     </div>
   </div>
+
+  <div class="btn-row">
+    <button onclick="analyzeLogs()" id="mainBtn">开始分析</button>
+    <button class="secondary" onclick="clearAll()">清空</button>
+    <button class="secondary" onclick="exportReport()">导出报告</button>
+  </div>
+
   <div class="stats" id="stats"></div>
   <div class="results" id="results"></div>
   <div class="llm-summary" id="llmSummary" style="display:none"></div>
@@ -116,55 +440,47 @@ button.secondary { background: #333; color: #eee; }
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="输入问题，按 Enter 发送..."></textarea>
-      <button onclick="sendChat()" style="height:60px;">发送</button>
-      <button class="secondary" onclick="clearChat()" style="height:60px;">清空</button>
+      <button onclick="sendChat()">发送</button>
+      <button class="secondary" onclick="clearChat()">清空</button>
     </div>
   </div>
 </div>
 <script>
 const rules = [
-  { pattern: /oom\s*killer/i, type: 'performance', severity: 'critical', category: '内存', suggestion: '系统内存不足，OOM killer启动了。检查: 1) dmesg -T | grep -i oom 2) top/htop查看内存使用 3) 排查内存泄漏进程' },
-  { pattern: /load\s*average/i, type: 'performance', severity: 'warning', category: 'CPU', suggestion: '系统负载偏高。检查: uptime查看负载历史，top定位高负载进程' },
-  { pattern: /iowait/i, type: 'performance', severity: 'warning', category: 'IO', suggestion: 'IO等待过高。检查: iostat -x 2 5查看IO瓶颈，定位频繁读写的进程' },
-  { pattern: /out\s*of\s*memory/i, type: 'performance', severity: 'critical', category: '内存', suggestion: '内存耗尽。检查: free -m, dmesg -T | grep memory' },
-  { pattern: /disk\s*(full|space)/i, type: 'fault', severity: 'critical', category: '磁盘', suggestion: '磁盘空间不足。检查: df -h, 定位大文件: du -sh /*' },
-  { pattern: /failed\s*password/i, type: 'security', severity: 'warning', category: '认证', suggestion: '检测到密码失败尝试。建议: 1) 检查/var/log/auth.log 2) 确认是否为合法用户 3) 考虑fail2ban防护' },
-  { pattern: /authentication\s*failure/i, type: 'security', severity: 'warning', category: '认证', suggestion: '认证失败。排查是否为暴力攻击，检查来源IP' },
-  { pattern: /sudo/i, type: 'security', severity: 'info', category: '权限', suggestion: 'sudo命令使用记录。正常情况，但如果与failed password连续出现需关注' },
-  { pattern: /connection\s*refused/i, type: 'fault', severity: 'warning', category: '网络', suggestion: '连接被拒绝。检查目标服务是否运行: systemctl status <服务名>' },
-  { pattern: /network\s*(down|unreachable)/i, type: 'fault', severity: 'critical', category: '网络', suggestion: '网络故障。检查: ip addr, ping网关, cat /proc/net/dev' },
-  { pattern: /service\s*(failed|stopped)/i, type: 'fault', severity: 'warning', category: '服务', suggestion: '服务异常。检查: systemctl status <服务名>, journalctl -u <服务名>' },
-  { pattern: /kernel\s*panic/i, type: 'fault', severity: 'critical', category: '系统', suggestion: '内核崩溃。需要: 1) 检查dmesg内核日志 2) 确认硬件故障 3) 查看是否有kdump生成core' },
-  { pattern: /segfault/i, type: 'fault', severity: 'warning', category: '程序', suggestion: '程序崩溃(段错误)。检查: dmesg | grep segfault, 定位问题进程' },
-  { pattern: /permission\s*denied/i, type: 'security', severity: 'info', category: '权限', suggestion: '权限拒绝。检查文件/目录权限和SELinux状态' },
-  { pattern: /invalid\s*user/i, type: 'security', severity: 'warning', category: '认证', suggestion: '尝试使用无效用户名登录。可能的暴力破解行为' },
-  { pattern: /CRON/i, type: 'info', severity: 'info', category: '定时任务', suggestion: 'CRON定时任务执行记录。正常系统行为' },
-  { pattern: /sshd/i, type: 'security', severity: 'info', category: 'SSH', suggestion: 'SSH连接记录。如发现异常IP访问，考虑加强防护' },
-  { pattern: /\berror\b/i, type: 'fault', severity: 'warning', category: '错误', suggestion: '一般错误。需结合上下文判断，建议查看完整日志上下文' },
-  { pattern: /\bcritical\b/i, type: 'fault', severity: 'critical', category: '错误', suggestion: '严重错误。立即检查相关服务状态和配置' },
-  { pattern: /\bwarning\b/i, type: 'fault', severity: 'warning', category: '警告', suggestion: '警告信息。关注是否有持续出现，排查根本原因' },
+  { pattern: /oom\s*killer/i, type: 'performance', severity: 'critical', category: '内存', suggestion: 'OOM killer启动。检查: dmesg -T | grep -i oom, top/htop内存使用' },
+  { pattern: /load\s*average/i, type: 'performance', severity: 'warning', category: 'CPU', suggestion: '系统负载偏高。uptime查看历史，top定位高负载进程' },
+  { pattern: /iowait/i, type: 'performance', severity: 'warning', category: 'IO', suggestion: 'IO等待过高。iostat -x 2 5查看瓶颈' },
+  { pattern: /out\s*of\s*memory/i, type: 'performance', severity: 'critical', category: '内存', suggestion: '内存耗尽。free -m, dmesg -T | grep memory' },
+  { pattern: /disk\s*(full|space)/i, type: 'fault', severity: 'critical', category: '磁盘', suggestion: '磁盘空间不足。df -h, du -sh /*' },
+  { pattern: /failed\s*password/i, type: 'security', severity: 'warning', category: '认证', suggestion: '密码失败尝试。检查/var/log/auth.log，考虑fail2ban' },
+  { pattern: /authentication\s*failure/i, type: 'security', severity: 'warning', category: '认证', suggestion: '认证失败。排查暴力攻击来源IP' },
+  { pattern: /sudo/i, type: 'security', severity: 'info', category: '权限', suggestion: 'sudo使用记录。正常，但与failed password连续出现需关注' },
+  { pattern: /connection\s*refused/i, type: 'fault', severity: 'warning', category: '网络', suggestion: '连接被拒绝。systemctl status <服务名>' },
+  { pattern: /network\s*(down|unreachable)/i, type: 'fault', severity: 'critical', category: '网络', suggestion: '网络故障。ip addr, ping网关' },
+  { pattern: /service\s*(failed|stopped)/i, type: 'fault', severity: 'warning', category: '服务', suggestion: '服务异常。systemctl status <服务名>' },
+  { pattern: /kernel\s*panic/i, type: 'fault', severity: 'critical', category: '系统', suggestion: '内核崩溃。dmesg, 确认硬件故障' },
+  { pattern: /segfault/i, type: 'fault', severity: 'warning', category: '程序', suggestion: '段错误。dmesg | grep segfault' },
+  { pattern: /permission\s*denied/i, type: 'security', severity: 'info', category: '权限', suggestion: '权限拒绝。检查文件权限和SELinux' },
+  { pattern: /invalid\s*user/i, type: 'security', severity: 'warning', category: '认证', suggestion: '无效用户名登录尝试。可能的暴力破解' },
+  { pattern: /CRON/i, type: 'info', severity: 'info', category: '定时任务', suggestion: 'CRON任务执行。正常系统行为' },
+  { pattern: /sshd/i, type: 'security', severity: 'info', category: 'SSH', suggestion: 'SSH连接记录。检查异常IP访问' },
+  { pattern: /\berror\b/i, type: 'fault', severity: 'warning', category: '错误', suggestion: '一般错误。结合上下文判断' },
+  { pattern: /\bcritical\b/i, type: 'fault', severity: 'critical', category: '错误', suggestion: '严重错误。立即检查相关服务' },
+  { pattern: /\bwarning\b/i, type: 'fault', severity: 'warning', category: '警告', suggestion: '警告信息。关注持续出现的情况' },
 ];
 
-let currentResults = [];
-let currentLogText = '';
-let chatHistory = [];
+let currentResults = [], currentLogText = '', chatHistory = [], apiBaseUrl = '';
 
 function parseLine(line) {
-  const syslogRegex = /^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$/;
-  const match = line.match(syslogRegex);
-  if (match) {
-    return { time: match[1], host: match[2], proc: match[3], pid: match[4], msg: match[5], raw: line };
-  }
-  return { time: '', host: '', proc: '', pid: '', msg: line, raw: line };
+  const regex = /^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$/;
+  const m = line.match(regex);
+  return m ? { time: m[1], host: m[2], proc: m[3], pid: m[4], msg: m[5], raw: line } : { time: '', host: '', proc: '', pid: '', msg: line, raw: line };
 }
 
 function analyzeLogs() {
   const input = document.getElementById('logInput').value.trim();
   if (!input) { alert('请输入日志内容'); return; }
-  currentLogText = input;
-  currentResults = [];
-  chatHistory = [];
-
+  currentLogText = input; currentResults = []; chatHistory = [];
   if (document.getElementById('useLLM').checked) {
     const apiKey = document.getElementById('apiKey').value.trim();
     if (!apiKey) { alert('请先输入 API Key'); return; }
@@ -174,24 +490,41 @@ function analyzeLogs() {
     document.getElementById('chatSection').style.display = 'block';
     document.getElementById('chatMessages').innerHTML = '';
     callLLM(input);
-  } else {
-    doRuleAnalysis();
-  }
+  } else { doRuleAnalysis(); }
 }
 
 function doRuleAnalysis() {
-  const lines = currentLogText.split('\n');
-  lines.forEach(line => {
+  currentLogText.split('\n').forEach(line => {
     if (!line.trim()) return;
-    const parsed = parseLine(line);
-    rules.forEach(rule => {
-      if (rule.pattern.test(parsed.msg) || rule.pattern.test(parsed.raw)) {
-        currentResults.push({ ...rule, line: parsed.raw, time: parsed.time, host: parsed.host });
-      }
-    });
+    const p = parseLine(line);
+    rules.forEach(r => { if (r.pattern.test(p.msg) || r.pattern.test(p.raw)) currentResults.push({...r, line: p.raw, time: p.time, host: p.host}); });
   });
   renderResults(currentResults);
   document.getElementById('mainBtn').disabled = false;
+}
+
+function renderResults(results) {
+  const s = { critical: 0, warning: 0, info: 0 };
+  results.forEach(r => s[r.severity]++);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
+    <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
+    <div class="stat-card info"><div class="num">${s.info}</div><div class="label">信息</div></div>`;
+  if (!results.length) { document.getElementById('results').innerHTML = '<div class="empty">未检测到问题模式</div>'; return; }
+  document.getElementById('results').innerHTML = results.map(r => `
+    <div class="issue-card ${r.severity}">
+      <div class="header">
+        <span>${r.time ? `<span class="time">${r.time}</span> ` : ''}${r.host ? `@${r.host} ` : ''}[${r.category}]</span>
+        <span class="tag ${r.severity}">${r.severity}</span>
+      </div>
+      <div class="content">${escapeHtml(r.line)}</div>
+      <div class="suggestion">💡 ${r.suggestion}</div>
+    </div>`).join('');
+}
+
+function getApiUrl() {
+  const u = apiBaseUrl || 'https://api.deepseek.com';
+  return u.endsWith('/v1/chat/completions') ? u : u + '/v1/chat/completions';
 }
 
 async function callLLM(logText) {
@@ -200,155 +533,61 @@ async function callLLM(logText) {
     apiBaseUrl = document.getElementById('apiUrl').value.trim();
     const model = document.getElementById('modelSelect').value;
     const summaryDiv = document.getElementById('llmSummary');
+    const prompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
+请分析以下系统日志，识别: 1)硬件故障(硬盘/光模块/内存UCE) 2)性能问题 3)系统错误
+日志内容: ${logText.slice(0,8000)}
+输出: ##问题概述 ##硬件问题 ##性能分析 ##优化建议 ##监控指标`;
 
-    const prompt = `你是一个Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
-
-请分析以下系统日志，识别以下问题：
-1. 硬件故障：硬盘慢盘/坏道、光模块异常、内存UCE/ERR、CPU故障
-2. 性能问题：IO瓶颈、CPU过载、内存泄漏、网络延迟
-3. 系统错误：kernel panic、服务崩溃、文件系统问题
-
-日志内容：
-${logText.slice(0, 8000)}
-
-请输出结构化报告：
-## 问题概述
-（一句话总结主要问题）
-
-## 硬件问题
-（列出来，按严重程度排序，包含具体磁盘/光模块/内存地址等详细信息）
-
-## 性能分析
-（分析CPU/内存/IO/网络瓶颈）
-
-## 优化建议
-（具体可执行的优化方案，按优先级排序）
-
-## 需要持续监控的指标
-（建议添加的监控项）
-
-要求：简洁专业，重点突出硬件和性能问题，给出可操作的建议。`;
-
-    const response = await fetch(getApiUrl(), {
+    const resp = await fetch(getApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 2500 })
     });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || `API错误: ${response.status}`);
-    }
-    const data = await response.json();
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
+    const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
     summaryDiv.innerHTML = `<h3>🤖 LLM 分析结果</h3><pre>${escapeHtml(content)}</pre>`;
     chatHistory.push({ role: 'assistant', content });
   } catch (err) {
-    const summaryDiv = document.getElementById('llmSummary');
-    summaryDiv.className = 'llm-summary error';
-    summaryDiv.innerHTML = `<h3>❌ 分析失败</h3><pre>${escapeHtml(err.message)}</pre>`;
-  } finally {
-    document.getElementById('mainBtn').disabled = false;
-  }
-}
-
-function renderResults(results) {
-  const stats = { critical: 0, warning: 0, info: 0 };
-  results.forEach(r => stats[r.severity]++);
-  document.getElementById('stats').innerHTML = `
-    <div class="stat-card critical"><div class="num">${stats.critical}</div>严重</div>
-    <div class="stat-card warning"><div class="num">${stats.warning}</div>警告</div>
-    <div class="stat-card info"><div class="num">${stats.info}</div>信息</div>
-  `;
-  if (results.length === 0) {
-    document.getElementById('results').innerHTML = '<div class="empty">未检测到问题模式</div>';
-    return;
-  }
-  const html = results.map(r => `
-    <div class="issue-card ${r.severity}">
-      <div class="header">
-        <span>${r.time ? `<span class="time">${r.time}</span> ` : ''}${r.host ? `@${r.host} ` : ''}[${r.category}]</span>
-        <span class="tag ${r.severity}">${r.severity}</span>
-      </div>
-      <div class="content">${escapeHtml(r.line)}</div>
-      <div class="suggestion">💡 ${r.suggestion}</div>
-    </div>
-  `).join('');
-  document.getElementById('results').innerHTML = html;
-}
-
-let apiBaseUrl = '';
-function getApiUrl() {
-  const u = apiBaseUrl || 'https://api.deepseek.com';
-  return u.endsWith('/v1/chat/completions') ? u : u + '/v1/chat/completions';
+    const d = document.getElementById('llmSummary');
+    d.className = 'llm-summary error';
+    d.innerHTML = `<h3>❌ 分析失败</h3><pre>${escapeHtml(err.message)}</pre>`;
+  } finally { document.getElementById('mainBtn').disabled = false; }
 }
 
 async function sendChat() {
-  const input = document.getElementById('chatInput');
-  const msg = input.value.trim();
+  const input = document.getElementById('chatInput'), msg = input.value.trim();
   if (!msg) return;
   const apiKey = document.getElementById('apiKey').value.trim();
   if (!apiKey) { alert('请先输入 API Key'); return; }
   apiBaseUrl = document.getElementById('apiUrl').value.trim();
-
   const msgsDiv = document.getElementById('chatMessages');
-  const section = document.getElementById('chatSection');
-  section.style.display = 'block';
+  document.getElementById('chatSection').style.display = 'block';
   document.getElementById('llmSummary').style.display = 'none';
-
   chatHistory.push({ role: 'user', content: msg });
   msgsDiv.innerHTML += `<div class="chat-msg user"><strong>你:</strong><pre>${escapeHtml(msg)}</pre></div>`;
   input.value = '';
-
-  const loading = document.createElement('div');
-  loading.className = 'chat-msg assistant';
-  loading.innerHTML = '<span class="spinner"></span> 分析中...';
-  msgsDiv.appendChild(loading);
-  msgsDiv.scrollTop = msgsDiv.scrollHeight;
-
+  const loading = document.createElement('div'); loading.className = 'chat-msg assistant'; loading.innerHTML = '<span class="spinner"></span> 分析中...';
+  msgsDiv.appendChild(loading); msgsDiv.scrollTop = msgsDiv.scrollHeight;
   try {
     const model = document.getElementById('modelSelect').value;
-    const systemPrompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘/坏道、光模块异常、内存UCE/ERR、CPU故障）和性能优化。
-
-当前对话背景: 已分析的日志内容${currentLogText ? '\n\n日志片段:\n' + currentLogText.slice(0,3000) : ''}
-
-请结合日志内容回答问题，重点关注硬件故障和性能优化。`;
-    const messages = [{ role: 'system', content: systemPrompt }, ...chatHistory];
-
-    const response = await fetch(getApiUrl(), {
+    const systemPrompt = `你是Linux服务器运维专家。当前日志:\n${currentLogText ? currentLogText.slice(0,3000) : ''}\n请结合上下文回答。`;
+    const resp = await fetch(getApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 1500 })
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...chatHistory], temperature: 0.3, max_tokens: 1500 })
     });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || `API错误: ${response.status}`);
-    }
-    const data = await response.json();
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
+    const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
     chatHistory.push({ role: 'assistant', content });
     loading.innerHTML = `<strong>助手:</strong><pre>${escapeHtml(content)}</pre>`;
-  } catch (err) {
-    loading.className = 'chat-msg error';
-    loading.innerHTML = `<strong>错误:</strong><pre>${escapeHtml(err.message)}</pre>`;
-  }
+  } catch (err) { loading.className = 'chat-msg error'; loading.innerHTML = `<strong>错误:</strong><pre>${escapeHtml(err.message)}</pre>`; }
   msgsDiv.scrollTop = msgsDiv.scrollHeight;
 }
 
-function clearChat() {
-  chatHistory = [];
-  document.getElementById('chatMessages').innerHTML = '';
-  document.getElementById('chatSection').style.display = 'none';
-}
-
-document.getElementById('chatInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
-});
-
-function escapeHtml(text) {
-  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function clearChat() { chatHistory = []; document.getElementById('chatMessages').innerHTML = ''; document.getElementById('chatSection').style.display = 'none'; }
+function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function clearAll() {
   document.getElementById('logInput').value = '';
@@ -356,172 +595,115 @@ function clearAll() {
   document.getElementById('stats').innerHTML = '';
   document.getElementById('llmSummary').style.display = 'none';
   document.getElementById('chatSection').style.display = 'none';
-  document.getElementById('chatMessages').innerHTML = '';
-  document.getElementById('chatInput').value = '';
-  currentResults = [];
-  currentLogText = '';
-  chatHistory = [];
+  currentResults = []; currentLogText = ''; chatHistory = [];
 }
 
 function exportReport() {
-  const resultsText = document.getElementById('results').innerText;
-  const llmText = document.getElementById('llmSummary').innerText;
-  if (!resultsText && !llmText) { alert('没有可导出的分析结果'); return; }
-  let content = '=== OS Log Analyzer Report ===\n';
-  content += '时间: ' + new Date().toLocaleString() + '\n\n';
-  content += '--- 规则分析结果 ---\n';
-  content += resultsText || '无';
-  if (llmText) {
-    content += '\n\n--- LLM 综合分析 ---\n';
-    content += llmText;
-  }
-  const blob = new Blob([content], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'log-analysis-' + new Date().toISOString().slice(0,10) + '.txt';
-  a.click();
+  const r = document.getElementById('results').innerText, l = document.getElementById('llmSummary').innerText;
+  if (!r && !l) { alert('没有可导出的分析结果'); return; }
+  let c = '=== OS Log Analyzer Report ===\n时间: ' + new Date().toLocaleString() + '\n\n--- 规则分析结果 ---\n' + (r || '无');
+  if (l) c += '\n\n--- LLM 分析 ---\n' + l;
+  const b = new Blob([c], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+  a.download = 'log-analysis-' + new Date().toISOString().slice(0,10) + '.txt'; a.click();
 }
 
 function saveConfig() {
-  const key = document.getElementById('apiKey').value.trim();
-  const model = document.getElementById('modelSelect').value;
-  const url = document.getElementById('apiUrl').value.trim();
-  if (key) localStorage.setItem('llm_api_key', key);
-  if (model) localStorage.setItem('llm_model', model);
-  if (url) localStorage.setItem('llm_api_url', url);
-  else localStorage.removeItem('llm_api_url');
+  const k = document.getElementById('apiKey').value.trim(), m = document.getElementById('modelSelect').value, u = document.getElementById('apiUrl').value.trim();
+  if (k) localStorage.setItem('llm_api_key', k);
+  if (m) localStorage.setItem('llm_model', m);
+  if (u) localStorage.setItem('llm_api_url', u); else localStorage.removeItem('llm_api_url');
   alert('配置已保存');
 }
 
 function loadConfig() {
-  const key = localStorage.getItem('llm_api_key');
-  const model = localStorage.getItem('llm_model');
-  const url = localStorage.getItem('llm_api_url');
-  if (key) document.getElementById('apiKey').value = key;
-  if (model) document.getElementById('modelSelect').value = model;
-  if (url) document.getElementById('apiUrl').value = url;
+  const k = localStorage.getItem('llm_api_key'), m = localStorage.getItem('llm_model'), u = localStorage.getItem('llm_api_url');
+  if (k) document.getElementById('apiKey').value = k;
+  if (m) document.getElementById('modelSelect').value = m;
+  if (u) document.getElementById('apiUrl').value = u;
 }
 loadConfig();
 
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
+// Theme switcher
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.body.dataset.theme = btn.dataset.theme;
+    localStorage.setItem('theme', btn.dataset.theme);
+  });
+});
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) {
+  document.body.dataset.theme = savedTheme;
+  document.querySelectorAll('.theme-btn').forEach(b => { b.classList.toggle('active', b.dataset.theme === savedTheme); });
+}
+
+// File upload
+const dropZone = document.getElementById('dropZone'), fileInput = document.getElementById('fileInput');
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) readFile(file);
-});
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+function readFile(file) { const r = new FileReader(); r.onload = e => document.getElementById('logInput').value = e.target.result; r.readAsText(file); }
 
-function readFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => document.getElementById('logInput').value = e.target.result;
-  reader.readAsText(file);
-}
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
 
+// Download collect script
 function downloadCollectScript() {
-  const days = document.getElementById('historyDays').value;
-  const level = document.getElementById('collectLevel').value;
+  const days = document.getElementById('historyDays').value, level = document.getElementById('collectLevel').value;
   const script = generateScript(days, level);
-  const blob = new Blob([script], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `linux-os-log-collect-d${days}-${level}.sh`;
-  a.click();
+  const b = new Blob([script], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+  a.download = `linux-os-log-collect-d${days}-${level}.sh`; a.click();
 }
 
 function generateScript(days, level) {
-  const lines = [];
-  lines.push('#!/bin/bash');
-  lines.push('# Linux OS Log Collector - Auto-generated');
-  lines.push('# Generated: ' + new Date().toISOString());
-  lines.push('# History: ' + days + ' days | Level: ' + level);
-  lines.push('');
-  lines.push('set -euo pipefail');
-  lines.push('TMPDIR=$(mktemp -d /tmp/log_collector.XXXXXX)');
-  lines.push('trap "rm -rf $TMPDIR 2>/dev/null || true" EXIT');
-  lines.push('');
-  lines.push('DEST="/tmp/system-logs-$(hostname)-$(date +%Y%m%d_%H%M%S).tar.gz"');
-  lines.push('echo "========================================"');
-  lines.push('echo "收集历史: ' + days + '天 | 级别: ' + level + '"');
-  lines.push('echo "输出文件: $DEST"');
-  lines.push('echo "========================================"');
-  lines.push('');
-
-  // 基础信息
-  lines.push('# === 系统信息 ===');
-  lines.push('uname -a > "$TMPDIR/01_system_info.txt"');
-  lines.push('uptime >> "$TMPDIR/01_system_info.txt"');
-  lines.push('free -h >> "$TMPDIR/01_system_info.txt"');
-  lines.push('df -h >> "$TMPDIR/01_system_info.txt"');
-  lines.push('');
-
-  // 实时硬件
-  lines.push('# === 实时硬件快照 ===');
-  lines.push('dmesg -T > "$TMPDIR/02_dmesg.log" 2>/dev/null || dmesg > "$TMPDIR/02_dmesg.log"');
-  lines.push('cat /var/log/dmesg* > "$TMPDIR/02_dmesg.old" 2>/dev/null || true');
-  lines.push('lsblk -a > "$TMPDIR/03_block_devices.txt"');
-  lines.push('cat /proc/diskstats > "$TMPDIR/04_diskstats.txt"');
-
+  const L = [];
+  L.push('#!/bin/bash'); L.push('# Linux OS Log Collector - Auto-generated'); L.push('# Generated: ' + new Date().toISOString());
+  L.push('# History: ' + days + ' days | Level: ' + level); L.push('');
+  L.push('set -euo pipefail'); L.push('TMPDIR=$(mktemp -d /tmp/log_collector.XXXXXX)');
+  L.push('trap "rm -rf $TMPDIR 2>/dev/null || true" EXIT'); L.push('');
+  L.push('DEST="/tmp/system-logs-$(hostname)-$(date +%Y%m%d_%H%M%S).tar.gz"');
+  L.push('echo "========================================"'); L.push('echo "历史: ' + days + '天 | 级别: ' + level + '"');
+  L.push('echo "输出: $DEST"'); L.push('echo "========================================"'); L.push('');
+  L.push('# === 系统信息 ==='); L.push('uname -a > "$TMPDIR/01_system_info.txt"');
+  L.push('uptime >> "$TMPDIR/01_system_info.txt"'); L.push('free -h >> "$TMPDIR/01_system_info.txt"');
+  L.push('df -h >> "$TMPDIR/01_system_info.txt"'); L.push('cat /proc/cpuinfo | grep -E "model name|cpu cores" >> "$TMPDIR/01_system_info.txt" 2>/dev/null || true');
+  L.push(''); L.push('# === 实时硬件 ==='); L.push('dmesg -T > "$TMPDIR/02_dmesg.log" 2>/dev/null || dmesg > "$TMPDIR/02_dmesg.log"');
+  L.push('cat /var/log/dmesg* > "$TMPDIR/02_dmesg.old" 2>/dev/null || true'); L.push('lsblk -a > "$TMPDIR/03_block_devices.txt"');
+  L.push('cat /proc/diskstats > "$TMPDIR/04_diskstats.txt"');
   if (level === 'hardware' || level === 'full') {
-    lines.push('');
-    lines.push('# === SMART 磁盘信息 ===');
-    lines.push('for dev in $(lsblk -d -n -o NAME | grep -E \'^sd|^nvme\' 2>/dev/null); do');
-    lines.push('  [[ -b "/dev/$dev" ]] && smartctl -a "/dev/$dev" > "$TMPDIR/05_smart_$dev.txt" 2>/dev/null || true');
-    lines.push('  [[ -b "/dev/$dev" ]] && smartctl -l error "/dev/$dev" > "$TMPDIR/06_smart_err_$dev.txt" 2>/dev/null || true');
-    lines.push('done');
-    lines.push('');
-    lines.push('# === 内存错误 ===');
-    lines.push('cat /proc/meminfo > "$TMPDIR/07_memory.txt"');
-    lines.push('dmesg | grep -i -E "uce|err|correctable|memory" > "$TMPDIR/08_mem_errors.txt" 2>/dev/null || true');
-    lines.push('cat /proc/buddyinfo > "$TMPDIR/09_buddyinfo.txt" 2>/dev/null || true');
+    L.push(''); L.push('# === SMART ===');
+    L.push('for dev in $(lsblk -d -n -o NAME | grep -E \'^sd|^nvme\' 2>/dev/null); do');
+    L.push('  [[ -b "/dev/$dev" ]] && smartctl -a "/dev/$dev" > "$TMPDIR/05_smart_$dev.txt" 2>/dev/null || true');
+    L.push('  [[ -b "/dev/$dev" ]] && smartctl -l error "/dev/$dev" > "$TMPDIR/06_smart_err_$dev.txt" 2>/dev/null || true');
+    L.push('done'); L.push(''); L.push('# === 内存错误 ===');
+    L.push('cat /proc/meminfo > "$TMPDIR/07_memory.txt"');
+    L.push('dmesg | grep -i -E "uce|err|correctable|memory" > "$TMPDIR/08_mem_errors.txt" 2>/dev/null || true');
   }
-
-  // 网络
-  lines.push('');
-  lines.push('# === 网络状态 ===');
-  lines.push('ip addr > "$TMPDIR/10_ip_addr.txt"');
-  lines.push('ip link > "$TMPDIR/11_ip_link.txt"');
-  lines.push('cat /proc/net/dev > "$TMPDIR/12_net_dev.txt"');
-  lines.push('ss -tuln > "$TMPDIR/13_ss_ports.txt" 2>/dev/null || true');
-  lines.push('dmesg | grep -i -E "optical|fiber|sfp|sfpp" > "$TMPDIR/14_optical.log" 2>/dev/null || true');
-
-  // 性能采样
+  L.push(''); L.push('# === 网络 ==='); L.push('ip addr > "$TMPDIR/10_ip_addr.txt"');
+  L.push('ip link > "$TMPDIR/11_ip_link.txt"'); L.push('cat /proc/net/dev > "$TMPDIR/12_net_dev.txt"');
+  L.push('ss -tuln > "$TMPDIR/13_ss_ports.txt" 2>/dev/null || true');
+  L.push('dmesg | grep -i -E "optical|fiber|sfp|sfpp" > "$TMPDIR/14_optical.log" 2>/dev/null || true');
   if (level === 'full') {
-    lines.push('');
-    lines.push('# === 性能采样 (后台) ===');
-    lines.push('(iostat -x 2 5 > "$TMPDIR/15_iostat.txt" 2>/dev/null &)');
-    lines.push('(mpstat -A 2 3 > "$TMPDIR/16_mpstat.txt" 2>/dev/null &)');
-    lines.push('(pidstat -u 2 5 > "$TMPDIR/17_pidstat.txt" 2>/dev/null &)');
-    lines.push('sleep 12');
-    lines.push('ps aux --no-headers > "$TMPDIR/18_processes.txt"');
-    lines.push('top -bn1 -o %MEM | head -30 > "$TMPDIR/19_top_mem.txt"');
-    lines.push('top -bn1 -o %CPU | head -30 > "$TMPDIR/20_top_cpu.txt"');
+    L.push(''); L.push('# === 性能采样 ===');
+    L.push('(iostat -x 2 5 > "$TMPDIR/15_iostat.txt" 2>/dev/null &)');
+    L.push('(mpstat -A 2 3 > "$TMPDIR/16_mpstat.txt" 2>/dev/null &)');
+    L.push('sleep 12'); L.push('ps aux --no-headers > "$TMPDIR/18_processes.txt"');
+    L.push('top -bn1 -o %MEM | head -30 > "$TMPDIR/19_top_mem.txt"');
   }
-
-  // 历史日志
-  lines.push('');
-  lines.push('# === 历史日志 (最近 ' + days + ' 天) ===');
-  lines.push('journalctl -k --since "-' + days + ' days" --no-pager > "$TMPDIR/30_kernel.log" 2>/dev/null || true');
-  lines.push('journalctl -p err --since "-' + days + ' days" --no-pager > "$TMPDIR/31_errors.log" 2>/dev/null || true');
-  lines.push('journalctl -p warning --since "-' + days + ' days" --no-pager > "$TMPDIR/32_warnings.log" 2>/dev/null || true');
-  lines.push('journalctl -u CRON --since "-' + days + ' days" --no-pager > "$TMPDIR/33_cron.log" 2>/dev/null || true');
-  lines.push('journalctl -u sshd --since "-' + days + ' days" --no-pager > "$TMPDIR/34_sshd.log" 2>/dev/null || true');
-  lines.push('cp /var/log/syslog "$TMPDIR/35_syslog.txt" 2>/dev/null || true');
-  lines.push('cp /var/log/messages "$TMPDIR/36_messages.txt" 2>/dev/null || true');
-  lines.push('cat /var/log/kern.log > "$TMPDIR/37_kern.log" 2>/dev/null || true');
-  lines.push('');
-  lines.push('# === 打包 ===');
-  lines.push('tar -czf "$DEST" -C "$(dirname "$TMPDIR")" "$(basename "$TMPDIR")"');
-  lines.push('');
-  lines.push('echo "=== 完成 ==="');
-  lines.push('echo "文件: $DEST"');
-  lines.push('echo "大小: $(du -h "$DEST" | cut -f1)"');
-
-  return lines.join('\n');
+  L.push(''); L.push('# === 历史日志 ===');
+  L.push('journalctl -k --since "-' + days + ' days" --no-pager > "$TMPDIR/30_kernel.log" 2>/dev/null || true');
+  L.push('journalctl -p err --since "-' + days + ' days" --no-pager > "$TMPDIR/31_errors.log" 2>/dev/null || true');
+  L.push('journalctl --since "-' + days + ' days" --no-pager > "$TMPDIR/32_journal.txt" 2>/dev/null || true');
+  L.push(''); L.push('# === 打包 ===');
+  L.push('tar -czf "$DEST" -C "$(dirname "$TMPDIR")" "$(basename "$TMPDIR")"');
+  L.push(''); L.push('echo "=== 完成 ==="'); L.push('echo "文件: $DEST"');
+  L.push('echo "大小: $(du -h "$DEST" | cut -f1)"');
+  return L.join('\n');
 }
+</script>
 </body>
 </html>
