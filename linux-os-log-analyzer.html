@@ -549,16 +549,39 @@ function analyzeLogs() {
   const input = document.getElementById('logInput').value.trim();
   if (!input) { alert('请输入日志内容'); return; }
   currentLogText = input; currentResults = []; chatHistory = [];
-  if (document.getElementById('useLLM').checked) {
+
+  // Show rule analysis progress
+  const statsDiv = document.getElementById('stats');
+  const resultsDiv = document.getElementById('results');
+  statsDiv.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></span> 规则解析中...</div>';
+  resultsDiv.innerHTML = '';
+
+  // Run rule analysis first (sync, but UI will update after this function returns)
+  doRuleAnalysis();
+
+  // Show rule results
+  renderResults(currentResults);
+
+  // Now handle LLM if enabled
+  const useLLM = document.getElementById('useLLM').checked;
+  const llmSummary = document.getElementById('llmSummary');
+
+  if (useLLM) {
     const apiKey = document.getElementById('apiKey').value.trim();
-    if (!apiKey) { alert('请先输入 API Key'); return; }
+    if (!apiKey) {
+      llmSummary.style.display = 'none';
+      alert('请先输入 API Key');
+      return;
+    }
     document.getElementById('mainBtn').disabled = true;
-    document.getElementById('llmSummary').style.display = 'block';
-    document.getElementById('llmSummary').innerHTML = '<h3><span class="spinner"></span> AI 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
+    llmSummary.style.display = 'block';
+    llmSummary.innerHTML = '<h3><span class="spinner"></span> AI 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
     document.getElementById('chatSection').style.display = 'block';
     document.getElementById('chatMessages').innerHTML = '';
-    callLLM(input);
-  } else { doRuleAnalysis(); }
+    callLLM(currentLogText, currentResults);
+  } else {
+    document.getElementById('mainBtn').disabled = false;
+  }
 }
 
 function doRuleAnalysis() {
@@ -595,7 +618,7 @@ function getApiUrl() {
   return u.endsWith('/v1/chat/completions') ? u : u + '/v1/chat/completions';
 }
 
-async function callLLM(logText) {
+async function callLLM(logText, ruleResults) {
   try {
     const apiKey = document.getElementById('apiKey').value.trim();
     if (!apiKey) { alert('请先输入 API Key'); return; }
@@ -605,8 +628,23 @@ async function callLLM(logText) {
     }
     const model = document.getElementById('modelSelect').value;
     const summaryDiv = document.getElementById('llmSummary');
+
+    // Build rule analysis summary
+    const ruleSummary = ruleResults && ruleResults.length > 0
+      ? `规则匹配发现 ${ruleResults.length} 个问题：\n` +
+        `严重: ${ruleResults.filter(r => r.severity === 'critical').length} | ` +
+        `警告: ${ruleResults.filter(r => r.severity === 'warning').length} | ` +
+        `信息: ${ruleResults.filter(r => r.severity === 'info').length}\n\n` +
+        ruleResults.slice(0, 20).map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 100)}`).join('\n')
+      : '规则匹配未发现问题。';
+
     const prompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
 请分析以下系统日志，识别: 1)硬件故障(硬盘/光模块/内存UCE) 2)性能问题 3)系统错误
+
+## 规则匹配结果（已自动解析）
+${ruleSummary}
+
+## 日志内容
 日志内容: ${logText.slice(0,8000)}
 输出: ##问题概述 ##硬件问题 ##性能分析 ##优化建议 ##监控指标`;
 
