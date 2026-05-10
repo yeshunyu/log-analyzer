@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src https://api.deepseek.com https://api.openai.com; style-src 'self' 'unsafe-inline';">
 <title>LogScope - Linux Log Analyzer</title>
 <style>
 /* === Theme Variables === */
@@ -152,6 +153,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.card-title svg { opacity: 0.8; }
 }
 
 /* === Drop Zone === */
@@ -367,27 +370,84 @@ button.secondary:hover { background: var(--border); }
   color: var(--warning);
   font-family: 'Monaco', 'Consolas', monospace;
 }
+.disclaimer {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+}
+.about-dropdown { position: relative; }
+.about-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+.about-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+.about-panel {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  z-index: 100;
+}
+.about-panel.show { display: block; }
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header">
-    <h1>LogScope <span style="font-size:0.4em;color:var(--text-muted);font-weight:400;">v0.1rc1</span></h1>
-    <div class="theme-switcher">
-      <button class="theme-btn active" data-theme="ops">Dark Ops</button>
-      <button class="theme-btn" data-theme="tech">Cyber Blue</button>
-      <button class="theme-btn" data-theme="light">Clean Light</button>
+  <div class="header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h1 style="margin:0;">LogScope</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="theme-switcher" style="gap:4px;">
+        <button class="theme-btn active" data-theme="ops" style="padding:5px 10px;font-size:0.8em;">Dark Ops</button>
+        <button class="theme-btn" data-theme="tech" style="padding:5px 10px;font-size:0.8em;">Cyber Blue</button>
+        <button class="theme-btn" data-theme="light" style="padding:5px 10px;font-size:0.8em;">Clean Light</button>
+      </div>
+      <div class="about-dropdown">
+        <button class="about-btn" onclick="toggleAbout()">关于</button>
+        <div class="about-panel" id="aboutPanel">
+          <div style="padding:16px;min-width:280px;">
+            <div style="font-size:1.1em;font-weight:600;color:var(--accent);margin-bottom:12px;">LogScope</div>
+            <div style="color:var(--text-secondary);font-size:0.85em;line-height:1.6;margin-bottom:12px;">
+              Linux 系统日志分析工具，支持 DeepSeek V4 智能分析和硬件问题诊断。
+            </div>
+            <div style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px;">
+              <div style="margin-bottom:4px;">版本: v0.2rc1</div>
+              <div>⚠️ AI 分析结果仅供参考</div>
+            </div>
+            <a href="https://github.com/yeshunyu/log-analyzer" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:0.85em;text-decoration:none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+              GitHub
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="drop-zone" id="dropZone">拖拽日志文件到这里，或点击选择文件</div>
-    <input type="file" id="fileInput" style="display:none">
+    <div class="drop-zone" id="dropZone">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px;opacity:0.6;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <div id="fileInfo" style="margin-bottom:8px;">拖拽日志文件到此处，或点击选择文件</div>
+      <div style="font-size:0.8em;opacity:0.6;">支持格式: .log .txt .tar.gz .gz | syslog dmesg journalctl smartctl 等</div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" accept=".log,.txt,.tar.gz,.gz,.bz2,.xz,*">
     <textarea id="logInput" placeholder="粘贴日志内容，或上传文件..."></textarea>
   </div>
 
   <div class="card">
-    <div class="card-title">🔧 生成日志收集脚本</div>
+    <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> 生成日志收集脚本</div>
     <div class="collect-row">
       <select id="historyDays">
         <option value="1">最近 1 天</option>
@@ -409,7 +469,7 @@ button.secondary:hover { background: var(--border); }
   </div>
 
   <div class="card">
-    <div class="card-title">⚙️ LLM 配置</div>
+    <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> LLM 配置</div>
     <div class="config-row">
       <select id="modelSelect">
         <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
@@ -429,20 +489,31 @@ button.secondary:hover { background: var(--border); }
   <div class="btn-row">
     <button onclick="analyzeLogs()" id="mainBtn">开始分析</button>
     <button class="secondary" onclick="clearAll()">清空</button>
-    <button class="secondary" onclick="exportReport()">导出报告</button>
+    <button class="secondary" onclick="exportReport()" style="display:flex;align-items:center;gap:6px;">
+      导出报告
+      <select id="exportFormat" onchange="exportReport()" style="background:transparent;border:none;color:inherit;padding:0;font-size:0.9em;cursor:pointer;">
+        <option value="md">.md</option>
+        <option value="html">.html</option>
+      </select>
+    </button>
   </div>
 
   <div class="stats" id="stats"></div>
   <div class="results" id="results"></div>
   <div class="llm-summary" id="llmSummary" style="display:none"></div>
   <div class="chat-section" id="chatSection" style="display:none">
-    <h3>💬 和大模型对话</h3>
+    <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 和大模型对话</h3>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-row">
       <textarea id="chatInput" placeholder="输入问题，按 Enter 发送..."></textarea>
       <button onclick="sendChat()">发送</button>
       <button class="secondary" onclick="clearChat()">清空</button>
     </div>
+  </div>
+
+  <div class="disclaimer">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    分析结果由 AI 生成，仅供参考。实际问题排查请结合日志原始内容自行判断。
   </div>
 </div>
 <script>
@@ -486,7 +557,7 @@ function analyzeLogs() {
     if (!apiKey) { alert('请先输入 API Key'); return; }
     document.getElementById('mainBtn').disabled = true;
     document.getElementById('llmSummary').style.display = 'block';
-    document.getElementById('llmSummary').innerHTML = '<h3><span class="spinner"></span> LLM 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
+    document.getElementById('llmSummary').innerHTML = '<h3><span class="spinner"></span> AI 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
     document.getElementById('chatSection').style.display = 'block';
     document.getElementById('chatMessages').innerHTML = '';
     callLLM(input);
@@ -518,7 +589,7 @@ function renderResults(results) {
         <span class="tag ${r.severity}">${r.severity}</span>
       </div>
       <div class="content">${escapeHtml(r.line)}</div>
-      <div class="suggestion">💡 ${r.suggestion}</div>
+      <div class="suggestion"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> ${r.suggestion}</div>
     </div>`).join('');
 }
 
@@ -530,7 +601,11 @@ function getApiUrl() {
 async function callLLM(logText) {
   try {
     const apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) { alert('请先输入 API Key'); return; }
     apiBaseUrl = document.getElementById('apiUrl').value.trim();
+    if (apiBaseUrl && !apiBaseUrl.startsWith('https://')) {
+      alert('警告: API URL 建议使用 https://，否则 API Key 可能明文泄露！');
+    }
     const model = document.getElementById('modelSelect').value;
     const summaryDiv = document.getElementById('llmSummary');
     const prompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
@@ -538,20 +613,20 @@ async function callLLM(logText) {
 日志内容: ${logText.slice(0,8000)}
 输出: ##问题概述 ##硬件问题 ##性能分析 ##优化建议 ##监控指标`;
 
-    const resp = await fetch(getApiUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 2500 })
-    });
+    const url = getApiUrl();
+    const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+    const body = JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 2500 });
+
+    const resp = await fetch(url, { method: 'POST', headers, body });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
     const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
-    summaryDiv.innerHTML = `<h3>🤖 LLM 分析结果</h3><pre>${escapeHtml(content)}</pre>`;
+    summaryDiv.innerHTML = `<h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> LLM 分析结果</h3><pre>${escapeHtml(content)}</pre>`;
     chatHistory.push({ role: 'assistant', content });
   } catch (err) {
     const d = document.getElementById('llmSummary');
     d.className = 'llm-summary error';
-    d.innerHTML = `<h3>❌ 分析失败</h3><pre>${escapeHtml(err.message)}</pre>`;
+    d.innerHTML = `<h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> 分析失败</h3><pre>${escapeHtml(err.message)}</pre>`;
   } finally { document.getElementById('mainBtn').disabled = false; }
 }
 
@@ -572,11 +647,10 @@ async function sendChat() {
   try {
     const model = document.getElementById('modelSelect').value;
     const systemPrompt = `你是Linux服务器运维专家。当前日志:\n${currentLogText ? currentLogText.slice(0,3000) : ''}\n请结合上下文回答。`;
-    const resp = await fetch(getApiUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...chatHistory], temperature: 0.3, max_tokens: 1500 })
-    });
+    const url = getApiUrl();
+    const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+    const body = JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...chatHistory], temperature: 0.3, max_tokens: 1500 });
+    const resp = await fetch(url, { method: 'POST', headers, body });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
     const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
@@ -595,17 +669,108 @@ function clearAll() {
   document.getElementById('stats').innerHTML = '';
   document.getElementById('llmSummary').style.display = 'none';
   document.getElementById('chatSection').style.display = 'none';
+  document.getElementById('fileInfo').innerHTML = '拖拽日志文件到此处，或点击选择文件';
   currentResults = []; currentLogText = ''; chatHistory = [];
 }
 
 function exportReport() {
-  const r = document.getElementById('results').innerText, l = document.getElementById('llmSummary').innerText;
-  if (!r && !l) { alert('没有可导出的分析结果'); return; }
-  let c = '=== OS Log Analyzer Report ===\n时间: ' + new Date().toLocaleString() + '\n\n--- 规则分析结果 ---\n' + (r || '无');
-  if (l) c += '\n\n--- LLM 分析 ---\n' + l;
-  const b = new Blob([c], { type: 'text/plain' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
-  a.download = 'log-analysis-' + new Date().toISOString().slice(0,10) + '.txt'; a.click();
+  const fmt = document.getElementById('exportFormat').value;
+  const r = document.getElementById('results');
+  const l = document.getElementById('llmSummary');
+  if (!r.innerText && !l.innerText) { alert('没有可导出的分析结果'); return; }
+  const date = new Date().toLocaleString();
+  const dateStr = new Date().toISOString().slice(0,10);
+
+  if (fmt === 'md') {
+    let c = '# LogScope 分析报告\n\n';
+    c += '> 生成时间: ' + date + '\n\n';
+    const s = document.getElementById('stats');
+    if (s.innerText) {
+      const lines = s.innerText.split('\n');
+      c += '## 统计概览\n\n';
+      c += '| 严重 | 警告 | 信息 |\n';
+      c += '|------|------|------|\n';
+      c += '| ' + lines[0] + ' | ' + lines[1] + ' | ' + lines[2] + ' |\n\n';
+    }
+    if (r.innerText) {
+      c += '## 规则匹配结果\n\n';
+      r.querySelectorAll('.issue-card').forEach(card => {
+        const tag = card.querySelector('.tag');
+        const sev = tag ? tag.className.replace('tag ','').replace('critical','🔴 严重').replace('warning','🟡 警告').replace('info','🟢 信息') : '';
+        const content = card.querySelector('.content').innerText;
+        const suggestion = card.querySelector('.suggestion')?.innerText || '';
+        const header = card.querySelector('.header').innerText.replace(/\n/g,' ').replace(sev,'').trim();
+        c += '### ' + header + ' ' + sev + '\n\n';
+        c += '```\n' + content + '\n```\n\n';
+        c += '> 💡 ' + suggestion.replace('💡 ','') + '\n\n';
+      });
+    }
+    if (l.innerText && l.style.display !== 'none') {
+      c += '## LLM 分析结果\n\n';
+      c += '```\n' + l.innerText + '\n```\n\n';
+    }
+    c += '\n---\n> ⚠️ **免责声明**: 分析结果由 AI 生成，仅供参考。实际问题排查请结合日志原始内容自行判断。\n';
+    const blob = new Blob([c], { type: 'text/markdown' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'log-analysis-' + dateStr + '.md'; a.click();
+  } else {
+    let c = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>LogScope 分析报告</title>';
+    c += '<style>';
+    c += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:900px;margin:0 auto;padding:20px;background:#0d1117;color:#e6edf3;}';
+    c += 'h1{color:#58a6ff;border-bottom:1px solid #30363d;padding-bottom:10px;}';
+    c += 'h2{color:#58a6ff;margin-top:30px;}';
+    c += 'h3{color:#8b949e;margin-top:20px;}';
+    c += '.meta{color:#8b949e;font-size:0.9em;margin-bottom:20px;}';
+    c += '.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0;}';
+    c += '.stat{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;text-align:center;}';
+    c += '.stat .num{font-size:2em;font-weight:bold;}';
+    c += '.stat.critical .num{color:#f85149;}.stat.warning .num{color:#d29922;}.stat.info .num{color:#3fb950;}';
+    c += '.issue{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin:12px 0;border-left:4px solid;}';
+    c += '.issue.critical{border-color:#f85149;}.issue.warning{border-color:#d29922;}.issue.info{border-color:#3fb950;}';
+    c += '.issue-header{display:flex;justify-content:space-between;margin-bottom:10px;}';
+    c += '.tag{padding:4px 10px;border-radius:6px;font-size:0.8em;font-weight:bold;}';
+    c += '.tag.critical{background:#f85149;color:#fff;}.tag.warning{background:#d29922;color:#000;}.tag.info{background:#3fb950;color:#fff;}';
+    c += '.content{color:#8b949e;font-family:monospace;font-size:0.9em;word-break:break-all;margin:10px 0;}';
+    c += '.suggestion{background:#21262d;padding:12px;border-radius:6px;color:#58a6ff;font-size:0.9em;}';
+    c += '.llm{background:#161b22;border:1px solid #58a6ff;border-radius:8px;padding:20px;margin-top:20px;}';
+    c += '.llm pre{white-space:pre-wrap;word-break:break-all;background:#0d1117;padding:15px;border-radius:6px;}';
+    c += 'blockquote{color:#8b949e;border-left:3px solid #30363d;margin:10px 0;padding-left:15px;}';
+    c += '</style></head><body>';
+    c += '<h1>LogScope 分析报告</h1>';
+    c += '<div class="meta">生成时间: ' + date + '</div>';
+    const s = document.getElementById('stats');
+    if (s.innerText) {
+      const lines = s.innerText.split('\n');
+      c += '<div class="stats">';
+      c += '<div class="stat critical"><div class="num">' + lines[0] + '</div><div>严重</div></div>';
+      c += '<div class="stat warning"><div class="num">' + lines[1] + '</div><div>警告</div></div>';
+      c += '<div class="stat info"><div class="num">' + lines[2] + '</div><div>信息</div></div>';
+      c += '</div>';
+    }
+    if (r.innerHTML) {
+      c += '<h2>规则匹配结果</h2>';
+      r.querySelectorAll('.issue-card').forEach(card => {
+        const tag = card.querySelector('.tag');
+        const sev = tag ? tag.className.replace('tag ','') : '';
+        const header = card.querySelector('.header').innerText;
+        const content = card.querySelector('.content').innerText;
+        const suggestion = card.querySelector('.suggestion')?.innerText || '';
+        c += '<div class="issue ' + sev + '">';
+        c += '<div class="issue-header"><span>' + header + '</span><span class="tag ' + sev + '">' + sev + '</span></div>';
+        c += '<div class="content">' + content.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+        c += '<div class="suggestion">💡 ' + suggestion.replace('💡 ','') + '</div>';
+        c += '</div>';
+      });
+    }
+    if (l.innerText && l.style.display !== 'none') {
+      c += '<div class="llm"><h2>LLM 分析结果</h2><pre>' + l.innerText.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre></div>';
+    }
+    c += '<div style="text-align:center;color:#8b949e;font-size:0.8em;padding:20px 0;margin-top:30px;border-top:1px solid #30363d;">⚠️ 免责声明: 分析结果由 AI 生成，仅供参考。实际问题排查请结合日志原始内容自行判断。</div>';
+    c += '</body></html>';
+    const blob = new Blob([c], { type: 'text/html' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'log-analysis-' + dateStr + '.html'; a.click();
+  }
 }
 
 function saveConfig() {
@@ -646,7 +811,19 @@ dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classL
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
-function readFile(file) { const r = new FileReader(); r.onload = e => document.getElementById('logInput').value = e.target.result; r.readAsText(file); }
+function readFile(file) {
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('logInput').value = e.target.result;
+    document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已选择: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ')';
+  };
+  r.readAsText(file);
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
 
 document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
 
@@ -704,6 +881,17 @@ function generateScript(days, level) {
   L.push('echo "大小: $(du -h "$DEST" | cut -f1)"');
   return L.join('\n');
 }
+
+// About dropdown
+function toggleAbout() {
+  document.getElementById('aboutPanel').classList.toggle('show');
+}
+document.addEventListener('click', function(e) {
+  const dropdown = document.querySelector('.about-dropdown');
+  if (dropdown && !dropdown.contains(e.target)) {
+    document.getElementById('aboutPanel').classList.remove('show');
+  }
+});
 </script>
 </body>
 </html>
