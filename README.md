@@ -69,7 +69,21 @@ sudo ./linux-os-log-collect.sh
 |------|------|
 | `linux-os-log-analyzer.html` | 主程序，直接浏览器打开 |
 | `linux-os-log-collect.sh` | Linux 日志收集脚本 |
-| `README.md` | 本文档 |
+| `backend/app.py` | 可选的 Flask 静态文件服务器 |
+| `Dockerfile` | 容器构建文件 |
+| `docker-compose.yml` | 容器编排 |
+| `README.md` / `README-en.md` | 文档（中文 / 英文） |
+
+## Docker
+
+```bash
+docker run -d -p 5000:5000 yuyeshun2/logscope:v0.2rc1
+```
+
+或使用 docker-compose：
+```bash
+DEEPSEEK_API_KEY=your_key docker-compose up -d
+```
 
 ## License
 
