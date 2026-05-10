@@ -1,4 +1,4 @@
-# Linux OS Log Analyzer v0.1rc1
+# LogScope v0.1rc1
 
 单文件 HTML 工具，用于 Linux 系统日志分析，支持 LLM 智能分析和硬件问题诊断。
 
