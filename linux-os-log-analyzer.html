@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src https://api.deepseek.com https://api.openai.com; style-src 'self' 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src https://api.deepseek.com https://api.openai.com; style-src 'self' 'unsafe-inline';">
 <title>LogScope - Linux Log Analyzer</title>
 <style>
 /* === Theme Variables === */
@@ -399,10 +399,8 @@ button.secondary:hover { background: var(--border); }
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--card-shadow);
-  z-index: 100;
-}
-.about-panel.show { display: block; }
-</style>
+  </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -812,12 +810,173 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
 function readFile(file) {
-  const r = new FileReader();
-  r.onload = e => {
-    document.getElementById('logInput').value = e.target.result;
-    document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已选择: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ')';
-  };
-  r.readAsText(file);
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.gz') || name.endsWith('.bz2') || name.endsWith('.xz')) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        let content = decompress(e.target.result, name);
+        document.getElementById('logInput').value = content;
+        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ') → ' + formatSize(content.length) + ')';
+      } catch(err) {
+        alert('解压失败: ' + err.message);
+        document.getElementById('logInput').value = e.target.result;
+      }
+    };
+    reader.onerror = () => alert('文件读取失败');
+    reader.readAsArrayBuffer(file);
+  } else if (name.endsWith('.tar.gz') || name.endsWith('.tgz') || name.endsWith('.tar')) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const content = extractTarLogs(e.target.result, name);
+        document.getElementById('logInput').value = content;
+        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ') → ' + formatSize(content.length) + ')';
+      } catch(err) {
+        alert('解压失败: ' + err.message);
+      }
+    };
+    reader.onerror = () => alert('文件读取失败');
+    reader.readAsArrayBuffer(file);
+  } else if (name.endsWith('.zip')) {
+    // Handle zip with a simple approach
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const content = extractZipLogs(e.target.result);
+        document.getElementById('logInput').value = content;
+        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ') → ' + formatSize(content.length) + ')';
+      } catch(err) {
+        alert('解压失败: ' + err.message);
+      }
+    };
+    reader.onerror = () => alert('文件读取失败');
+    reader.readAsArrayBuffer(file);
+  } else {
+    const r = new FileReader();
+    r.onload = e => {
+      document.getElementById('logInput').value = e.target.result;
+      document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已选择: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ')';
+    };
+    r.readAsText(file);
+  }
+}
+
+// Decompress .gz, .bz2, .xz
+function decompress(buffer, filename) {
+  const bytes = new Uint8Array(buffer);
+  if (filename.endsWith('.gz')) {
+    const result = pako.inflate(bytes);
+    return new TextDecoder().decode(result);
+  }
+  // .bz2 and .xz need streaming - use pako's inflate for now
+  if (filename.endsWith('.bz2') || filename.endsWith('.xz')) {
+    // These need streaming decoders, fall back to raw
+    return new TextDecoder().decode(bytes);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+// Extract text files from tar/tar.gz
+function extractTarLogs(buffer, filename) {
+  const bytes = new Uint8Array(buffer);
+  let offset = 0;
+  let content = '';
+  const logExtensions = ['.log', '.txt', '.err', '.out', '.json', ''];
+  const keyFiles = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors'];
+
+  // If gzipped, inflate first
+  let tarBytes = bytes;
+  if (filename.endsWith('.gz')) {
+    try {
+      const inflated = pako.inflate(bytes);
+      tarBytes = new Uint8Array(inflated);
+    } catch(e) {
+      // Not a proper gzip, treat as raw tar
+    }
+  }
+
+  while (offset + 512 <= tarBytes.length) {
+    const header = tarBytes.slice(offset, offset + 512);
+    const name = Array.from(header.slice(0, 100)).map(b => b === 0 ? '' : String.fromCharCode(b)).join('').replace(/\0.*$/, '').trim();
+    const sizeStr = Array.from(header.slice(124, 136)).map(b => String.fromCharCode(b)).join('').trim();
+    const size = parseInt(sizeStr, 8);
+    const type = header[156];
+
+    if (!name) break;
+
+    // Check if this is a relevant text file
+    const lowerName = name.toLowerCase();
+    const isKeyFile = keyFiles.some(k => lowerName.includes(k));
+    const isTextFile = logExtensions.some(ext => lowerName.endsWith(ext) || isKeyFile);
+
+    if (isTextFile && size > 0 && size < 10 * 1024 * 1024) { // max 10MB per file
+      const fileData = tarBytes.slice(offset + 512, offset + 512 + size);
+      try {
+        const text = new TextDecoder('utf-8', { fatal: false }).decode(fileData);
+        content += '=== ' + name + ' ===\n' + text + '\n\n';
+      } catch(e) {
+        // Skip binary files
+      }
+    }
+
+    offset += 512 + Math.ceil(size / 512) * 512;
+    if (offset >= tarBytes.length) break;
+  }
+
+  if (!content) {
+    throw new Error('压缩包内未找到日志文件');
+  }
+  return content;
+}
+
+// Extract from zip (basic, no external lib needed for small zips)
+function extractZipLogs(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let offset = 0;
+  let content = '';
+
+  // Simple zip parsing: find Local File Headers and extract
+  while (offset < bytes.length - 30) {
+    const sig = bytes.slice(offset, offset + 4);
+    if (sig[0] !== 0x50 || sig[1] !== 0x4b) break; // not a zip signature
+
+    const sigType = sig[2] * 256 + sig[3];
+    if (sigType === 0x0403) { // Local file header
+      const nameLen = bytes[offset + 26] + bytes[offset + 27] * 256;
+      const extraLen = bytes[offset + 28] + bytes[offset + 29] * 256;
+      const compressedSize = bytes[offset + 18] + bytes[offset + 19] * 256 + bytes[offset + 20] * 65536 + bytes[offset + 21] * 16777216;
+      const compMethod = bytes[offset + 8] + bytes[offset + 9] * 256;
+
+      const nameBytes = bytes.slice(offset + 30, offset + 30 + nameLen);
+      const name = Array.from(nameBytes).map(b => String.fromCharCode(b)).join('');
+
+      const dataOffset = offset + 30 + nameLen + extraLen;
+      const dataBytes = bytes.slice(dataOffset, dataOffset + compressedSize);
+
+      const lowerName = name.toLowerCase();
+      if ((lowerName.endsWith('.log') || lowerName.endsWith('.txt') || lowerName.includes('log') || lowerName.includes('syslog') || lowerName.includes('messages')) && compressedSize > 0 && compressedSize < 5 * 1024 * 1024) {
+        try {
+          let text;
+          if (compMethod === 0) { // stored
+            text = new TextDecoder('utf-8', { fatal: false }).decode(dataBytes);
+          } else if (compMethod === 8) { // deflate
+            const inflated = pako.inflate(dataBytes);
+            text = new TextDecoder('utf-8', { fatal: false }).decode(inflated);
+          }
+          if (text) content += '=== ' + name + ' ===\n' + text + '\n\n';
+        } catch(e) {}
+      }
+      offset = dataOffset + compressedSize;
+    } else if (sigType === 0x0201 || sigType === 0x0605) { // central directory or end
+      break;
+    } else {
+      offset++;
+    }
+  }
+
+  if (!content) throw new Error('压缩包内未找到日志文件');
+  return content;
 }
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
