@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OS Log Analyzer</title>
+<title>Linux OS Log Analyzer</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
@@ -64,11 +64,11 @@ button.secondary { background: #333; color: #eee; }
 </head>
 <body>
 <div class="container">
-  <h1>OS Log Analyzer</h1>
+  <h1>Linux OS Log Analyzer</h1>
   <div class="input-section">
     <div class="drop-zone" id="dropZone">拖拽日志文件到这里，或点击选择文件</div>
     <div style="margin-top:10px; font-size:0.85em; color:#888;">
-      Linux 日志收集脚本: <a href="collect.sh" download style="color:#00d4ff;">下载 collect.sh</a>
+      Linux 日志收集脚本: <a href="linux-os-log-collect.sh" download style="color:#00d4ff;">下载 collect.sh</a>
     </div>
     <input type="file" id="fileInput" style="display:none" accept=".log,.txt,*">
     <textarea id="logInput" placeholder="粘贴日志内容..."></textarea>
@@ -83,7 +83,7 @@ button.secondary { background: #333; color: #eee; }
     </div>
     <div style="margin-top:10px; font-size:0.85em; color:#888;">
       <label><input type="checkbox" id="useLLM" checked style="margin-right:5px;">使用 LLM 分析</label>
-      <span style="margin-left:20px;">Linux 日志收集: <a href="collect.sh" download style="color:#00d4ff;">下载 collect.sh</a></span>
+      <span style="margin-left:20px;">Linux 日志收集: <a href="linux-os-log-collect.sh" download style="color:#00d4ff;">下载 collect.sh</a></span>
     </div>
     <div class="btn-row">
       <button onclick="analyzeLogs()" id="mainBtn">开始分析</button>
