@@ -67,8 +67,26 @@ button.secondary { background: #333; color: #eee; }
   <h1>Linux OS Log Analyzer <span style="font-size:0.5em;color:#888;">v0.1rc1</span></h1>
   <div class="input-section">
     <div class="drop-zone" id="dropZone">拖拽日志文件到这里，或点击选择文件</div>
-    <div style="margin-top:10px; font-size:0.85em; color:#888;">
-      Linux 日志收集脚本: <a href="linux-os-log-collect.sh" download style="color:#00d4ff;">下载 collect.sh</a>
+    <div class="collect-section" style="background:#16213e;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h3 style="color:#00d4ff;margin-bottom:15px;">🔧 生成日志收集脚本</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select id="historyDays" style="background:#0f0f23;border:1px solid #333;border-radius:6px;color:#eee;padding:8px 12px;">
+          <option value="1">最近 1 天</option>
+          <option value="3">最近 3 天</option>
+          <option value="7" selected>最近 7 天</option>
+          <option value="14">最近 14 天</option>
+          <option value="30">最近 30 天</option>
+        </select>
+        <select id="collectLevel" style="background:#0f0f23;border:1px solid #333;border-radius:6px;color:#eee;padding:8px 12px;">
+          <option value="basic">基础 (系统信息+dmesg)</option>
+          <option value="hardware" selected>硬件 (含 SMART/内存错误)</option>
+          <option value="full">完整 (含性能采样+历史日志)</option>
+        </select>
+        <button onclick="downloadCollectScript()" style="background:#00d4ff;border:none;padding:10px 20px;border-radius:6px;color:#000;font-weight:bold;cursor:pointer;">下载收集脚本</button>
+      </div>
+      <div style="margin-top:10px;font-size:0.85em;color:#888;">
+        脚本将在服务器上收集: 历史日志( journalctl -S -Ndays ) + 实时快照(dmesg/smartctl/ps) + 性能数据(iostat/mpstat)
+      </div>
     </div>
     <input type="file" id="fileInput" style="display:none" accept=".log,.txt,*">
     <textarea id="logInput" placeholder="粘贴日志内容..."></textarea>
@@ -404,6 +422,105 @@ function readFile(file) {
   reader.onload = e => document.getElementById('logInput').value = e.target.result;
   reader.readAsText(file);
 }
-</script>
+
+function downloadCollectScript() {
+  const days = document.getElementById('historyDays').value;
+  const level = document.getElementById('collectLevel').value;
+  const script = generateScript(days, level);
+  const blob = new Blob([script], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `linux-os-log-collect-d${days}-${level}.sh`;
+  a.click();
+}
+
+function generateScript(days, level) {
+  const lines = [];
+  lines.push('#!/bin/bash');
+  lines.push('# Linux OS Log Collector - Auto-generated');
+  lines.push('# Generated: ' + new Date().toISOString());
+  lines.push('# History: ' + days + ' days | Level: ' + level);
+  lines.push('');
+  lines.push('set -euo pipefail');
+  lines.push('TMPDIR=$(mktemp -d /tmp/log_collector.XXXXXX)');
+  lines.push('trap "rm -rf $TMPDIR 2>/dev/null || true" EXIT');
+  lines.push('');
+  lines.push('DEST="/tmp/system-logs-$(hostname)-$(date +%Y%m%d_%H%M%S).tar.gz"');
+  lines.push('echo "收集历史: ' + days + '天 | 级别: ' + level + '"');
+  lines.push('echo "临时目录: $TMPDIR"');
+  lines.push('');
+
+  // 基础信息
+  lines.push('# === 系统信息 ===');
+  lines.push('uname -a > "$TMPDIR/01_system_info.txt"');
+  lines.push('uptime >> "$TMPDIR/01_system_info.txt"');
+  lines.push('free -h >> "$TMPDIR/01_system_info.txt"');
+  lines.push('df -h >> "$TMPDIR/01_system_info.txt"');
+  lines.push('');
+
+  // 实时硬件
+  lines.push('# === 实时硬件快照 ===');
+  lines.push('dmesg -T > "$TMPDIR/02_dmesg.log" 2>/dev/null || dmesg > "$TMPDIR/02_dmesg.log"');
+  lines.push('cat /var/log/dmesg* > "$TMPDIR/02_dmesg.old" 2>/dev/null || true');
+  lines.push('lsblk -a > "$TMPDIR/03_block_devices.txt"');
+  lines.push('cat /proc/diskstats > "$TMPDIR/04_diskstats.txt"');
+
+  if (level === 'hardware' || level === 'full') {
+    lines.push('');
+    lines.push('# === SMART 磁盘信息 ===');
+    lines.push('for dev in $(lsblk -d -n -o NAME | grep -E \'^sd|^nvme\' 2>/dev/null); do');
+    lines.push('  [[ -b "/dev/$dev" ]] && smartctl -a "/dev/$dev" > "$TMPDIR/05_smart_$dev.txt" 2>/dev/null || true');
+    lines.push('  [[ -b "/dev/$dev" ]] && smartctl -l error "/dev/$dev" > "$TMPDIR/06_smart_err_$dev.txt" 2>/dev/null || true');
+    lines.push('done');
+    lines.push('');
+    lines.push('# === 内存错误 ===');
+    lines.push('cat /proc/meminfo > "$TMPDIR/07_memory.txt"');
+    lines.push('dmesg | grep -i -E "uce|err|correctable|memory" > "$TMPDIR/08_mem_errors.txt" 2>/dev/null || true');
+    lines.push('cat /proc/buddyinfo > "$TMPDIR/09_buddyinfo.txt" 2>/dev/null || true');
+  }
+
+  // 网络
+  lines.push('');
+  lines.push('# === 网络状态 ===');
+  lines.push('ip addr > "$TMPDIR/10_ip_addr.txt"');
+  lines.push('ip link > "$TMPDIR/11_ip_link.txt"');
+  lines.push('cat /proc/net/dev > "$TMPDIR/12_net_dev.txt"');
+  lines.push('ss -tuln > "$TMPDIR/13_ss_ports.txt" 2>/dev/null || true');
+  lines.push('dmesg | grep -i -E "optical|fiber|sfp|sfpp" > "$TMPDIR/14_optical.log" 2>/dev/null || true');
+
+  // 性能采样
+  if (level === 'full') {
+    lines.push('');
+    lines.push('# === 性能采样 (后台) ===');
+    lines.push('(iostat -x 2 5 > "$TMPDIR/15_iostat.txt" 2>/dev/null &)');
+    lines.push('(mpstat -A 2 3 > "$TMPDIR/16_mpstat.txt" 2>/dev/null &)');
+    lines.push('(pidstat -u 2 5 > "$TMPDIR/17_pidstat.txt" 2>/dev/null &)');
+    lines.push('sleep 12');
+    lines.push('ps aux --no-headers > "$TMPDIR/18_processes.txt"');
+    lines.push('top -bn1 -o %MEM | head -30 > "$TMPDIR/19_top_mem.txt"');
+    lines.push('top -bn1 -o %CPU | head -30 > "$TMPDIR/20_top_cpu.txt"');
+  }
+
+  // 历史日志
+  lines.push('');
+  lines.push('# === 历史日志 (最近 ' + days + ' 天) ===');
+  lines.push('journalctl -k --since "-' + days + ' days" --no-pager > "$TMPDIR/30_kernel.log" 2>/dev/null || true');
+  lines.push('journalctl -p err --since "-' + days + ' days" --no-pager > "$TMPDIR/31_errors.log" 2>/dev/null || true');
+  lines.push('journalctl -p warning --since "-' + days + ' days" --no-pager > "$TMPDIR/32_warnings.log" 2>/dev/null || true');
+  lines.push('journalctl -u CRON --since "-' + days + ' days" --no-pager > "$TMPDIR/33_cron.log" 2>/dev/null || true');
+  lines.push('journalctl -u sshd --since "-' + days + ' days" --no-pager > "$TMPDIR/34_sshd.log" 2>/dev/null || true');
+  lines.push('cp /var/log/syslog "$TMPDIR/35_syslog.txt" 2>/dev/null || true');
+  lines.push('cp /var/log/messages "$TMPDIR/36_messages.txt" 2>/dev/null || true');
+  lines.push('cat /var/log/kern.log > "$TMPDIR/37_kern.log" 2>/dev/null || true');
+  lines.push('');
+  lines.push('# === 打包 ===');
+  lines.push('tar -czf "$DEST" -C "$(dirname "$TMPDIR")" "$(basename "$TMPDIR")"');
+  lines.push('');
+  lines.push('echo "=== 完成 ==="');
+  lines.push('echo "文件: $DEST"');
+  lines.push('echo "大小: $(du -h "$DEST" | cut -f1)"');
+
+  return lines.join('\n');
+}
 </body>
 </html>
