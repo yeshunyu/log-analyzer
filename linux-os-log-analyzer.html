@@ -443,6 +443,11 @@ button.secondary:hover { background: var(--border); }
     <textarea id="logInput" placeholder="粘贴日志内容，或上传文件..."></textarea>
   </div>
 
+  <div id="historySection" class="card" style="display:none;">
+    <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 最近上传 <span id="historyCount"></span></div>
+    <div id="historyList"></div>
+  </div>
+
   <div class="card">
     <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> 生成日志收集脚本</div>
     <div class="collect-row">
@@ -823,6 +828,7 @@ function loadConfig() {
   if (u) document.getElementById('apiUrl').value = u;
 }
 loadConfig();
+loadHistory();
 
 // Theme switcher
 document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -846,6 +852,44 @@ dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classL
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+// Load upload history
+function loadHistory() {
+  fetch('/api/history')
+    .then(r => r.json())
+    .then(data => {
+      const section = document.getElementById('historySection');
+      const list = document.getElementById('historyList');
+      const count = document.getElementById('historyCount');
+      if (data.history && data.history.length > 0) {
+        section.style.display = 'block';
+        count.textContent = '(' + data.history.length + ')';
+        list.innerHTML = data.history.map(h => `
+          <div class="history-item" onclick="loadHistoryItem(${h.id})" style="cursor:pointer;padding:8px 12px;margin:4px 0;background:var(--bg-tertiary);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.9em;color:var(--text-secondary);">${escapeHtml(h.filename)}</span>
+            <span style="font-size:0.8em;color:var(--text-muted);">${formatSize(h.content_size)}</span>
+          </div>
+        `).join('');
+      } else {
+        section.style.display = 'none';
+      }
+    })
+    .catch(() => {});
+}
+
+// Load a specific history item
+function loadHistoryItem(id) {
+  fetch('/api/history')
+    .then(r => r.json())
+    .then(data => {
+      const item = data.history.find(h => h.id === id);
+      if (item) {
+        document.getElementById('logInput').value = item.preview;
+        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size) + ')';
+      }
+    });
+}
+
 function readFile(file) {
   const formData = new FormData();
   formData.append('file', file);
@@ -866,7 +910,7 @@ function readFile(file) {
     });
 }
 
-// Extract text files from tar/tar.gz
+// Format bytes to human readable
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';

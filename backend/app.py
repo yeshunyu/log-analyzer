@@ -9,8 +9,8 @@ import tarfile
 import zipfile
 import bz2
 import lzma
+import time
 from flask import Flask, request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='../', static_url_path='')
 
@@ -20,6 +20,9 @@ API_URL = os.environ.get('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/c
 PORT = int(os.environ.get('PORT', 5000))
 
 ALLOWED_EXTENSIONS = {'.log', '.txt', '.tar.gz', '.tgz', '.tar', '.gz', '.bz2', '.xz', '.zip'}
+
+# Upload history (in-memory, 24h retention)
+upload_history = []  # list of {filename, size, content_size, preview, timestamp}
 
 def allowed_file(filename):
     return '.' in filename and filename.lower()[filename.rfind('.'):] in ALLOWED_EXTENSIONS
@@ -137,6 +140,25 @@ def upload():
 
     try:
         content = decompress_log_content(data, filename)
+
+        # Clean up expired entries (24h)
+        now = time.time()
+        while upload_history and now - upload_history[0]['timestamp'] > 86400:
+            upload_history.pop(0)
+
+        # Add to history
+        entry = {
+            'id': int(now * 1000),
+            'filename': filename,
+            'size': len(data),
+            'content_size': len(content),
+            'preview': content[:500] if len(content) > 500 else content,
+            'timestamp': now
+        }
+        upload_history.append(entry)
+
+        entry['preview'] = entry['preview'][:200] + '...' if len(entry['preview']) > 200 else entry['preview']
+
         return jsonify({
             'success': True,
             'filename': filename,
@@ -146,6 +168,25 @@ def upload():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/history', methods=['GET'])
+def history():
+    """Get upload history (last 24h)."""
+    now = time.time()
+    active = [h for h in upload_history if now - h['timestamp'] <= 86400]
+    return jsonify({
+        'history': [
+            {
+                'id': h['id'],
+                'filename': h['filename'],
+                'size': h['size'],
+                'content_size': h['content_size'],
+                'preview': h['preview'][:200] + ('...' if len(h['preview']) > 200 else ''),
+                'timestamp': h['timestamp']
+            }
+            for h in reversed(active[-10:])
+        ]
+    })
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
