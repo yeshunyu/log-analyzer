@@ -1,4 +1,4 @@
-# LogScope v0.2rc1
+# LogScope v0.3rc1
 
 Single-file HTML tool for Linux system log analysis, with LLM-powered diagnosis for hardware issues.
 
@@ -28,7 +28,7 @@ Simply open `linux-os-log-analyzer.html` in your browser - no installation neede
 ### Option 2: Docker
 For team sharing or long-running server deployment:
 ```bash
-docker run -d -p 5000:5000 yuyeshun2/logscope:v0.2rc1
+docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc1
 ```
 
 Or with docker-compose:

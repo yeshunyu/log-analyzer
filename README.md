@@ -1,4 +1,4 @@
-# LogScope v0.2rc1
+# LogScope v0.3rc1
 
 单文件 HTML 工具，用于 Linux 系统日志分析，支持 LLM 智能分析和硬件问题诊断。
 
@@ -28,7 +28,7 @@
 ### 方式二：Docker 部署
 适合团队共享或服务器长期运行：
 ```bash
-docker run -d -p 5000:5000 yuyeshun2/logscope:v0.2rc1
+docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc1
 ```
 
 或使用 docker-compose：
