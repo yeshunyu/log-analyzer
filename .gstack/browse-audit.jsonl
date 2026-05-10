@@ -1,4 +1,0 @@
-{"ts":"2026-05-09T14:01:25.421Z","cmd":"goto","args":"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q","origin":"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q","durationMs":1705,"status":"ok","hasCookies":false,"mode":"launched"}
-{"ts":"2026-05-09T14:01:26.709Z","cmd":"wait","args":"--networkidle","origin":"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q","durationMs":1288,"status":"ok","hasCookies":false,"mode":"launched"}
-{"ts":"2026-05-09T14:01:26.717Z","cmd":"text","args":"","origin":"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
-{"ts":"2026-05-09T14:01:26.717Z","cmd":"chain","args":"[[\"goto\",\"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q\"],[\"wait\",\"--networkidle\"],[\"text\"]]","origin":"https://mp.weixin.qq.com/s/_U54u4uNVFVCdz00H02g_Q","durationMs":3004,"status":"ok","hasCookies":false,"mode":"launched"}
