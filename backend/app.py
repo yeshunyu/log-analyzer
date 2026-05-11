@@ -78,7 +78,21 @@ def decompress_log_content(data, filename):
 
 def should_extract_file(name, size=0):
     """Check if a file from an archive is a relevant log file."""
-    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart', 'meminfo', 'diskstats']
+    # Skip hidden files (not the archive root) and known non-log directories
+    parts = name.replace('\\', '/').split('/')
+    for part in parts:
+        if part == '.' or part == '..' or not part:
+            continue
+        if part.startswith('.') or part == '__MACOSX':
+            return False
+    skip_dirs = {'dump_info', 'dump', 'dumps', 'cache', '__MACOSX'}
+    if len(parts) > 1 and any(p.lower() in skip_dirs for p in parts[:-1]):
+        return False
+
+    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart',
+                 'meminfo', 'diskstats', 'cpuinfo', 'buddyinfo', 'mdstat', 'mounts',
+                 'filesystems', 'raid', 'pci', 'lspci', 'ethtool', 'netstat', 'ss_',
+                 'processes', 'top_mem', 'top_cpu', 'pidstat', 'nmon', 'sysctl']
     log_exts = ['.log', '.txt', '.err', '.out', '.json']
     name_lower = name.lower()
     is_key = any(k in name_lower for k in key_files)
