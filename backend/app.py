@@ -274,7 +274,7 @@ def history():
                 'id': h['id'],
                 'filename': h['filename'],
                 'size': h['size'],
-                'content_size': h['content_size'],
+                'content_size': h.get('content_size', 0),
                 'preview': h['preview'][:200] + ('...' if len(h['preview']) > 200 else ''),
                 'timestamp': h['timestamp']
             }
@@ -292,7 +292,7 @@ def history_item(item_id):
                 'id': h['id'],
                 'filename': h['filename'],
                 'size': h['size'],
-                'content_size': h['content_size'],
+                'content_size': h.get('content_size', 0),
                 'preview': h['preview'],
                 'timestamp': h['timestamp']
             })

@@ -1043,6 +1043,8 @@ function readFile(file) {
           archiveDiv.innerHTML = `<div style="margin-bottom:8px;color:var(--accent);font-weight:600;">${escapeHtml(data.filename)} <span style="color:var(--text-secondary);font-weight:400;font-size:0.85em;">(${data.file_count} 个文件, ${formatSize(data.size)})</span></div>
             <pre class="tree-view">${escapeHtml(data.tree)}</pre>`;
           fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(data.filename) + '</strong> — ' + data.file_count + ' 个文件';
+          // 自动触发 per-file 扫描并显示结果
+          doPerFileAnalysis();
         } else {
           currentArchive = null;
           currentFiles = [];
