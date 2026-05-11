@@ -405,15 +405,15 @@ button.secondary:hover { background: var(--border); }
   background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px;
+  padding: 10px;
   font-family: 'Monaco', 'Consolas', monospace;
-  font-size: 13px;
+  font-size: 12px;
   white-space: pre;
   overflow-x: auto;
   line-height: 1.5;
-  max-height: 300px;
+  max-height: 180px;
   overflow-y: auto;
-  margin: 10px 0;
+  margin: 0;
 }
 .archive-meta { color: var(--text-secondary); font-size: 0.85em; margin-bottom: 8px; }
 .file-result-block {
@@ -497,13 +497,25 @@ button.secondary:hover { background: var(--border); }
       <div style="font-size:0.8em;opacity:0.6;">支持格式: .log .txt .tar.gz .gz | syslog dmesg journalctl smartctl 等</div>
     </div>
     <input type="file" id="fileInput" style="display:none" accept=".log,.txt,.tar.gz,.gz,.bz2,.xz,*">
+    <div id="archivePanel" style="display:none;margin-top:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div style="font-size:0.8em;color:var(--text-secondary);margin-bottom:4px;">目录结构</div>
+          <div id="archiveDisplay" style="max-height:200px;overflow-y:auto;"></div>
+        </div>
+        <div>
+          <div style="font-size:0.8em;color:var(--text-secondary);margin-bottom:4px;">手动输入关键词过滤</div>
+          <textarea id="manualFilter" placeholder="输入关键词，如: error, UCE, failed..." style="width:100%;min-height:80px;resize:vertical;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.85em;box-sizing:border-box;"></textarea>
+          <div style="font-size:0.75em;color:var(--text-muted);margin-top:4px;">输入关键词回车过滤文件列表</div>
+        </div>
+      </div>
+    </div>
     <textarea id="logInput" placeholder="粘贴日志内容，或上传文件..."></textarea>
-    <div id="archiveDisplay" style="display:none;"></div>
   </div>
 
   <div id="historySection" class="card" style="display:none;">
     <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 最近上传 <span id="historyCount"></span></div>
-    <div id="historyList"></div>
+    <div id="historyList" style="display:flex;flex-wrap:wrap;max-height:72px;overflow:hidden;"></div>
   </div>
 
   <div class="card">
@@ -944,7 +956,8 @@ function renderMarkdown(text) {
 function clearAll() {
   document.getElementById('logInput').value = '';
   document.getElementById('logInput').style.display = '';
-  document.getElementById('archiveDisplay').style.display = 'none';
+  document.getElementById('archivePanel').style.display = 'none';
+  document.getElementById('archiveDisplay').innerHTML = '';
   document.getElementById('results').innerHTML = '';
   document.getElementById('stats').innerHTML = '';
   document.getElementById('llmSummary').style.display = 'none';
@@ -1106,9 +1119,8 @@ function loadHistory() {
         section.style.display = 'block';
         count.textContent = '(' + data.history.length + ')';
         list.innerHTML = data.history.map(h => `
-          <div class="history-item" onclick="loadHistoryItem(${h.id})" style="cursor:pointer;padding:8px 12px;margin:4px 0;background:var(--bg-tertiary);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:0.9em;color:var(--text-secondary);">${escapeHtml(h.filename)}</span>
-            <span style="font-size:0.8em;color:var(--text-muted);">${formatSize(h.content_size)}</span>
+          <div class="history-item" onclick="loadHistoryItem(${h.id})" style="cursor:pointer;display:inline-block;padding:4px 10px;margin:2px;background:var(--bg-tertiary);border-radius:16px;font-size:0.78em;color:var(--text-secondary);border:1px solid var(--border);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(h.filename)}">
+            ${escapeHtml(h.filename)}
           </div>
         `).join('');
       } else {
@@ -1127,11 +1139,13 @@ function loadHistoryItem(id) {
         clearAll();
         if (item.is_archive) {
           document.getElementById('logInput').style.display = 'none';
-          document.getElementById('archiveDisplay').style.display = 'block';
+          document.getElementById('archivePanel').style.display = 'block';
           document.getElementById('archiveDisplay').innerHTML = '<pre class="tree-view">' + escapeHtml(item.preview) + '</pre>';
           currentArchive = item;
         } else {
-          document.getElementById('logInput').value = item.preview;
+          document.getElementById('archivePanel').style.display = 'block';
+          document.getElementById('archiveDisplay').innerHTML = `<div style="margin-bottom:6px;color:var(--accent);font-weight:600;font-size:0.85em;">${escapeHtml(item.filename)}</div><pre class="tree-view" style="max-height:160px;">${escapeHtml(item.preview.slice(0, 2000))}</pre>`;
+          document.getElementById('logInput').style.display = 'none';
           currentLogText = item.preview;
         }
         document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size || 0) + ')';
@@ -1159,9 +1173,9 @@ function readFile(file) {
           document.getElementById('results').innerHTML = '';
           document.getElementById('stats').innerHTML = '';
           document.getElementById('llmSummary').style.display = 'none';
+          document.getElementById('archivePanel').style.display = 'block';
           const archiveDiv = document.getElementById('archiveDisplay');
-          archiveDiv.style.display = 'block';
-          archiveDiv.innerHTML = `<div style="margin-bottom:8px;color:var(--accent);font-weight:600;">${escapeHtml(data.filename)} <span style="color:var(--text-secondary);font-weight:400;font-size:0.85em;">(${data.file_count} 个文件, ${formatSize(data.size)})</span></div>
+          archiveDiv.innerHTML = `<div style="margin-bottom:6px;color:var(--accent);font-weight:600;font-size:0.85em;">${escapeHtml(data.filename)} <span style="color:var(--text-secondary);font-weight:400;">(${data.file_count} 文件)</span></div>
             <pre class="tree-view">${escapeHtml(data.tree)}</pre>`;
           fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(data.filename) + '</strong> — ' + data.file_count + ' 个文件';
           // 自动触发 per-file 扫描并显示结果
@@ -1170,9 +1184,11 @@ function readFile(file) {
           currentArchive = null;
           currentFiles = [];
           currentLogText = data.content;
-          document.getElementById('archiveDisplay').style.display = 'none';
-          document.getElementById('logInput').style.display = '';
-          document.getElementById('logInput').value = data.content;
+          document.getElementById('archivePanel').style.display = 'block';
+          document.getElementById('archiveDisplay').innerHTML = `<div style="margin-bottom:6px;color:var(--accent);font-weight:600;font-size:0.85em;">${escapeHtml(file.name)} <span style="color:var(--text-secondary);font-weight:400;">(${formatSize(data.content_size)})</span></div>
+            <pre class="tree-view" style="max-height:160px;">${escapeHtml(data.content.slice(0, 2000))}${data.content.length > 2000 ? '\n... (内容过长，已截断)' : ''}</pre>`;
+          document.getElementById('logInput').style.display = 'none';
+          document.getElementById('logInput').value = '';
           document.getElementById('results').innerHTML = '';
           document.getElementById('stats').innerHTML = '';
           document.getElementById('llmSummary').style.display = 'none';

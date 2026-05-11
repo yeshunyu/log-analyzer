@@ -91,35 +91,47 @@ def is_skippable(parts):
             return True
     return False
 
-def build_tree(files):
-    """Build a tree-style string from file paths."""
-    # Group files by directory
+def build_tree(files, max_depth=3):
+    """Build a tree-style string from file paths, showing only directories up to max_depth levels."""
+    # Group files by directory, count files at each level
     tree = {}
+    file_counts = {}  # path -> count of files under that path
+
     for f in sorted(files, key=lambda x: x['path']):
         parts = f['path'].replace('\\', '/').split('/')
         node = tree
+        # Track file count for each directory level
         for i, p in enumerate(parts):
             if i == len(parts) - 1:
-                node[p] = f['size']
+                # It's a file, increment file counts for all parent paths
+                for j in range(1, len(parts)):
+                    parent = '/'.join(parts[:j])
+                    file_counts[parent] = file_counts.get(parent, 0) + 1
+                break
             else:
                 if p not in node:
                     node[p] = {}
                 node = node[p]
 
     lines = []
-    def _render(node, prefix, is_last):
+    def _render(node, prefix, is_last, depth, parent_path):
         items = list(node.items())
         for i, (name, val) in enumerate(items):
             is_item_last = (i == len(items) - 1)
             connector = '└── ' if is_item_last else '├── '
-            if isinstance(val, dict):
-                lines.append(prefix + connector + name + '/')
-                _render(val, prefix + ('    ' if is_item_last else '│   '), is_item_last)
+            current_path = (parent_path + '/' + name).lstrip('/')
+            if isinstance(val, dict) and depth < max_depth:
+                fc = file_counts.get(current_path, 0)
+                fc_str = f' ({fc} 文件)' if fc > 0 else ''
+                lines.append(prefix + connector + name + '/' + fc_str)
+                _render(val, prefix + ('    ' if is_item_last else '│   '), is_item_last, depth + 1, current_path)
             else:
-                size_str = format_bytes(val)
-                lines.append(prefix + connector + f'{name} ({size_str})')
+                # At max depth or leaf node, show file count for this directory
+                fc = file_counts.get(current_path, 0)
+                if fc > 0:
+                    lines.append(prefix + connector + name + '/ (' + str(fc) + ' 文件)')
 
-    _render(tree, '', True)
+    _render(tree, '', True, 0, '')
     return '\n'.join(lines)
 
 def format_bytes(b):
