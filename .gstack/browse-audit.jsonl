@@ -28,3 +28,7 @@
 {"ts":"2026-05-11T15:25:47.076Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":101,"status":"ok","hasCookies":false,"mode":"launched"}
 {"ts":"2026-05-11T15:27:00.789Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":31,"status":"ok","hasCookies":false,"mode":"launched"}
 {"ts":"2026-05-11T15:27:23.906Z","cmd":"screenshot","args":"/tmp/logscope-test2.png","origin":"http://localhost:5000/","durationMs":306,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:38:46.935Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":155,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:38:52.560Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":44,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:38:58.321Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:39:03.310Z","cmd":"screenshot","args":"/tmp/logscope-test3.png","origin":"http://localhost:5000/","durationMs":109,"status":"ok","hasCookies":false,"mode":"launched"}

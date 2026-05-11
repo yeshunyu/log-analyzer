@@ -286,6 +286,7 @@ def history():
                 'id': h['id'],
                 'filename': h['filename'],
                 'size': h['size'],
+                'is_archive': h.get('is_archive', False),
                 'content_size': h.get('content_size', 0),
                 'preview': h['preview'][:200] + ('...' if len(h['preview']) > 200 else ''),
                 'timestamp': h['timestamp']
@@ -304,6 +305,7 @@ def history_item(item_id):
                 'id': h['id'],
                 'filename': h['filename'],
                 'size': h['size'],
+                'is_archive': h.get('is_archive', False),
                 'content_size': h.get('content_size', 0),
                 'preview': h['preview'],
                 'timestamp': h['timestamp']

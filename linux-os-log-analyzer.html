@@ -735,11 +735,11 @@ function renderPerFileResults(perFileResults) {
       html += fr.results.map(r => `
         <div class="issue-card ${r.severity}" style="margin:6px 0;">
           <div class="header">
-            <span>${r.time ? `<span class="time">${r.time}</span> ` : ''}[${r.category}]</span>
+            <span>${r.time ? `<span class="time">${escapeHtml(r.time)}</span> ` : ''}[${escapeHtml(r.category)}]</span>
             <span class="tag ${r.severity}">${r.severity}</span>
           </div>
           <div class="content">${escapeHtml(r.line)}</div>
-          <div class="suggestion">${r.suggestion}</div>
+          <div class="suggestion">${escapeHtml(r.suggestion)}</div>
         </div>`).join('');
     }
     html += '</div></div>';
@@ -824,11 +824,11 @@ function renderResults(results) {
   document.getElementById('results').innerHTML = results.map(r => `
     <div class="issue-card ${r.severity}">
       <div class="header">
-        <span>${r.time ? `<span class="time">${r.time}</span> ` : ''}${r.host ? `@${r.host} ` : ''}[${r.category}]</span>
+        <span>${r.time ? `<span class="time">${escapeHtml(r.time)}</span> ` : ''}${r.host ? `@${escapeHtml(r.host)} ` : ''}[${escapeHtml(r.category)}]</span>
         <span class="tag ${r.severity}">${r.severity}</span>
       </div>
       <div class="content">${escapeHtml(r.line)}</div>
-      <div class="suggestion"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> ${r.suggestion}</div>
+      <div class="suggestion"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> ${escapeHtml(r.suggestion)}</div>
     </div>`).join('');
 }
 
@@ -933,13 +933,12 @@ function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 
 function renderMarkdown(text) {
   if (!text) return '';
-  // 先转义 HTML特殊字符（除了已用于markdown的）
-  text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // 先处理 markdown 语法，再转义剩余 HTML 字符
   // 代码块
   text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre style="background:var(--bg-primary);padding:12px;border-radius:6px;overflow-x:auto;font-size:0.85em;margin:8px 0;"><code>${code.trim()}</code></pre>`);
+    `<pre style="background:var(--bg-primary);padding:12px;border-radius:6px;overflow-x:auto;font-size:0.85em;margin:8px 0;"><code>${code.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</code></pre>`);
   // 行内代码
-  text = text.replace(/`([^`]+)`/g, '<code style="background:var(--bg-primary);padding:1px 5px;border-radius:3px;font-size:0.85em;">$1</code>');
+  text = text.replace(/`([^`]+)`/g, (_, c) => `<code style="background:var(--bg-primary);padding:1px 5px;border-radius:3px;font-size:0.85em;">${c.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code>`);
   // 标题 ## / ###
   text = text.replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--accent);font-size:0.95em;">$1</h4>');
   text = text.replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 6px;color:var(--accent);font-size:1.05em;border-bottom:1px solid var(--border);padding-bottom:4px;">$1</h3>');
@@ -950,6 +949,14 @@ function renderMarkdown(text) {
   text = text.replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:4px 0;padding-left:8px;">${m}</ul>`);
   // 换行
   text = text.replace(/\n/g, '<br>');
+  // 最后转义剩余 HTML 字符（不在标签和实体内的）
+  // 用占位符保护已转换的标签
+  const _PLACEHOLDER = '\x00PH\x00';
+  text = text.replace(/<[^>]+>/g, m => _PLACEHOLDER + btoa(m) + _PLACEHOLDER);
+  text = text.replace(/&[a-z]+;/gi, m => _PLACEHOLDER + btoa(m) + _PLACEHOLDER);
+  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // 恢复保护的标签和实体
+  text = text.replace(new RegExp(_PLACEHOLDER + '([^' + _PLACEHOLDER + ']+)' + _PLACEHOLDER, 'g'), (_, x) => atob(x));
   return text;
 }
 
