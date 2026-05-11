@@ -336,6 +336,17 @@ button.secondary:hover { background: var(--border); }
 }
 .llm-summary.error { border-color: var(--danger); }
 .llm-summary.error h3 { color: var(--danger); }
+.md-content {
+  line-height: 1.7;
+  font-size: 0.9em;
+  word-break: break-word;
+}
+.md-content h3 { margin: 14px 0 6px; color: var(--accent); font-size: 1.05em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.md-content h4 { margin: 12px 0 4px; color: var(--accent); font-size: 0.95em; }
+.md-content pre { background: var(--bg-primary); padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 0.85em; margin: 8px 0; }
+.md-content code { background: var(--bg-primary); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+.md-content ul { margin: 4px 0; padding-left: 16px; }
+.md-content li { margin: 2px 0; }
 
 /* === Chat === */
 .chat-section {
@@ -647,10 +658,56 @@ function doPerFileAnalysis() {
 function renderPerFileResults(perFileResults) {
   const s = { critical: 0, warning: 0, info: 0 };
   currentResults.forEach(r => s[r.severity]++);
+
+  // 按类别聚合
+  const byCat = {};
+  currentResults.forEach(r => { byCat[r.category] = (byCat[r.category] || 0) + 1; });
+  const catSorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const maxCat = catSorted[0]?.[1] || 1;
+
+  // Top 5 风险（按 severity 权重 + 出现次数）
+  const severityWeight = { critical: 3, warning: 2, info: 1 };
+  const top5 = [...currentResults]
+    .sort((a, b) => (severityWeight[b.severity] || 0) - (severityWeight[a.severity] || 0))
+    .slice(0, 5);
+
+  const catBars = catSorted.slice(0, 8).map(([cat, cnt]) => {
+    const pct = Math.round((cnt / maxCat) * 100);
+    return `<div style="margin:4px 0;">
+      <div style="display:flex;justify-content:space-between;font-size:0.8em;margin-bottom:2px;">
+        <span>${escapeHtml(cat)}</span><span style="color:var(--text-secondary);">${cnt}条</span>
+      </div>
+      <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const top5Html = top5.length > 0 ? top5.map((r, i) => `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85em;">
+      <span style="font-weight:700;color:var(--danger);min-width:20px;">${i + 1}</span>
+      <span class="tag ${r.severity}" style="flex-shrink:0;">${r.severity}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="color:var(--accent);margin-bottom:2px;">${escapeHtml(r.category)}</div>
+        <div style="color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.line.slice(0, 80))}</div>
+      </div>
+    </div>`).join('') : '<div style="color:var(--text-muted);font-size:0.85em;">未检测到问题</div>';
+
   document.getElementById('stats').innerHTML = `
-    <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
-    <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
-    <div class="stat-card info"><div class="num">${s.info}</div><div class="label">信息</div></div>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
+      <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:var(--bg-tertiary);border-radius:8px;padding:10px;">
+        <div style="font-size:0.75em;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">分类分布</div>
+        ${catBars}
+      </div>
+      <div style="background:var(--bg-tertiary);border-radius:8px;padding:10px;">
+        <div style="font-size:0.75em;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">Top 5 风险</div>
+        ${top5Html}
+      </div>
+    </div>`;
 
   let html = '';
   perFileResults.forEach(fr => {
@@ -705,10 +762,52 @@ function doRuleAnalysis() {
 function renderResults(results) {
   const s = { critical: 0, warning: 0, info: 0 };
   results.forEach(r => s[r.severity]++);
+
+  const byCat = {};
+  results.forEach(r => { byCat[r.category] = (byCat[r.category] || 0) + 1; });
+  const catSorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const maxCat = catSorted[0]?.[1] || 1;
+
+  const severityWeight = { critical: 3, warning: 2, info: 1 };
+  const top5 = [...results].sort((a, b) => (severityWeight[b.severity] || 0) - (severityWeight[a.severity] || 0)).slice(0, 5);
+
+  const catBars = catSorted.slice(0, 8).map(([cat, cnt]) => {
+    const pct = Math.round((cnt / maxCat) * 100);
+    return `<div style="margin:4px 0;">
+      <div style="display:flex;justify-content:space-between;font-size:0.8em;margin-bottom:2px;">
+        <span>${escapeHtml(cat)}</span><span style="color:var(--text-secondary);">${cnt}条</span>
+      </div>
+      <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const top5Html = top5.length > 0 ? top5.map((r, i) => `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85em;">
+      <span style="font-weight:700;color:var(--danger);min-width:20px;">${i + 1}</span>
+      <span class="tag ${r.severity}" style="flex-shrink:0;">${r.severity}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="color:var(--accent);margin-bottom:2px;">${escapeHtml(r.category)}</div>
+        <div style="color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.line.slice(0, 80))}</div>
+      </div>
+    </div>`).join('') : '<div style="color:var(--text-muted);font-size:0.85em;">未检测到问题</div>';
+
   document.getElementById('stats').innerHTML = `
-    <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
-    <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
-    <div class="stat-card info"><div class="num">${s.info}</div><div class="label">信息</div></div>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
+      <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:var(--bg-tertiary);border-radius:8px;padding:10px;">
+        <div style="font-size:0.75em;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">分类分布</div>
+        ${catBars}
+      </div>
+      <div style="background:var(--bg-tertiary);border-radius:8px;padding:10px;">
+        <div style="font-size:0.75em;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">Top 5 风险</div>
+        ${top5Html}
+      </div>
+    </div>`;
   if (!results.length) { document.getElementById('results').innerHTML = '<div class="empty">未检测到问题模式</div>'; return; }
   document.getElementById('results').innerHTML = results.map(r => `
     <div class="issue-card ${r.severity}">
@@ -774,7 +873,7 @@ ${logText ? '## 日志原文\n' + logText.slice(0, 4000) : ''}
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
     const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
-    summaryDiv.innerHTML = `<h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> LLM 分析结果</h3><pre>${escapeHtml(content)}</pre>`;
+    summaryDiv.innerHTML = `<h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> LLM 分析结果</h3><div class="md-content">${renderMarkdown(content)}</div>`;
     chatHistory.push({ role: 'assistant', content });
   } catch (err) {
     const d = document.getElementById('llmSummary');
@@ -812,13 +911,35 @@ async function sendChat() {
     const data = await resp.json();
     const content = data.choices[0]?.message?.content || '无输出';
     chatHistory.push({ role: 'assistant', content });
-    loading.innerHTML = `<strong>助手:</strong><pre>${escapeHtml(content)}</pre>`;
+    loading.innerHTML = `<strong>助手:</strong><div class="md-content">${renderMarkdown(content)}</div>`;
   } catch (err) { loading.className = 'chat-msg error'; loading.innerHTML = `<strong>错误:</strong><pre>${escapeHtml(err.message)}</pre>`; }
   msgsDiv.scrollTop = msgsDiv.scrollHeight;
 }
 
 function clearChat() { chatHistory = []; document.getElementById('chatMessages').innerHTML = ''; document.getElementById('chatSection').style.display = 'none'; }
 function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  // 先转义 HTML特殊字符（除了已用于markdown的）
+  text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // 代码块
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre style="background:var(--bg-primary);padding:12px;border-radius:6px;overflow-x:auto;font-size:0.85em;margin:8px 0;"><code>${code.trim()}</code></pre>`);
+  // 行内代码
+  text = text.replace(/`([^`]+)`/g, '<code style="background:var(--bg-primary);padding:1px 5px;border-radius:3px;font-size:0.85em;">$1</code>');
+  // 标题 ## / ###
+  text = text.replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--accent);font-size:0.95em;">$1</h4>');
+  text = text.replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 6px;color:var(--accent);font-size:1.05em;border-bottom:1px solid var(--border);padding-bottom:4px;">$1</h3>');
+  // 粗体
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // 列表
+  text = text.replace(/^[•\-*] (.+)$/gm, '<li style="margin:2px 0 2px 16px;">$1</li>');
+  text = text.replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:4px 0;padding-left:8px;">${m}</ul>`);
+  // 换行
+  text = text.replace(/\n/g, '<br>');
+  return text;
+}
 
 function clearAll() {
   document.getElementById('logInput').value = '';
