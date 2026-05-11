@@ -1,4 +1,4 @@
-# LogScope v0.3rc1
+# LogScope v0.3rc2
 
 Single-file HTML tool for Linux system log analysis, with LLM-powered diagnosis for hardware issues.
 
@@ -28,7 +28,7 @@ Simply open `linux-os-log-analyzer.html` in your browser - no installation neede
 ### Option 2: Docker
 For team sharing or long-running server deployment:
 ```bash
-docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc1
+docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc2
 ```
 
 Or with docker-compose:
@@ -85,3 +85,14 @@ The script outputs a `.tar.gz` archive. Transfer it to your workstation, extract
 ## License
 
 MIT
+
+---
+
+## Changelog
+
+### v0.3rc2 (2026-05-11)
+- **Security**: Upload size limit (100MB), API rate limiting (20 req/min/IP)
+- **Bug fix**: "About" dropdown not working
+- **Enhance**: Collect script synced with standalone version (added dmidecode/ethtool/netstat etc.)
+- **Backend**: /api/history/<id> endpoint for single item lookup, deduplicated extraction logic
+- **Code quality**: Fixed bare except anti-patterns

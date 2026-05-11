@@ -10,6 +10,7 @@ import zipfile
 import bz2
 import lzma
 import time
+from collections import defaultdict
 from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='../', static_url_path='')
@@ -18,14 +19,30 @@ app = Flask(__name__, static_folder='../', static_url_path='')
 API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 API_URL = os.environ.get('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions')
 PORT = int(os.environ.get('PORT', 5000))
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
 
 ALLOWED_EXTENSIONS = {'.log', '.txt', '.tar.gz', '.tgz', '.tar', '.gz', '.bz2', '.xz', '.zip'}
+
+# Rate limiter (in-memory, per-IP)
+_rate_limits = defaultdict(list)  # {ip: [timestamp, ...]}
+RATE_LIMIT = 20   # max requests
+RATE_WINDOW = 60  # seconds
 
 # Upload history (in-memory, 24h retention)
 upload_history = []  # list of {filename, size, content_size, preview, timestamp}
 
 def allowed_file(filename):
     return '.' in filename and filename.lower()[filename.rfind('.'):] in ALLOWED_EXTENSIONS
+
+def check_rate_limit(ip):
+    """Return (allowed: bool, remaining: int)."""
+    now = time.time()
+    window = now - RATE_WINDOW
+    _rate_limits[ip] = [t for t in _rate_limits[ip] if t > window]
+    if len(_rate_limits[ip]) >= RATE_LIMIT:
+        return False, 0
+    _rate_limits[ip].append(now)
+    return True, RATE_LIMIT - len(_rate_limits[ip])
 
 def decompress_log_content(data, filename):
     """Decompress and extract log content from various formats."""
@@ -59,30 +76,30 @@ def decompress_log_content(data, filename):
     # plain text - try decode
     return data.decode('utf-8', errors='replace')
 
+def should_extract_file(name, size=0):
+    """Check if a file from an archive is a relevant log file."""
+    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart', 'meminfo', 'diskstats']
+    log_exts = ['.log', '.txt', '.err', '.out', '.json']
+    name_lower = name.lower()
+    is_key = any(k in name_lower for k in key_files)
+    is_log = any(name_lower.endswith(ext) for ext in log_exts)
+    return (is_key or is_log) and 0 < size < 50 * 1024 * 1024
+
 def extract_tar(tar_io):
     """Extract relevant log files from tar archive."""
     content = []
-    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart', 'meminfo', 'diskstats']
-    log_exts = ['.log', '.txt', '.err', '.out', '.json']
-
     try:
         with tarfile.open(fileobj=tar_io) as tar:
             for member in tar.getmembers():
-                if not member.isfile():
+                if not member.isfile() or not should_extract_file(member.name, member.size):
                     continue
-                name_lower = member.name.lower()
-                is_key = any(k in name_lower for k in key_files)
-                is_log = any(name_lower.endswith(ext) for ext in log_exts)
-
-                if is_key or is_log:
-                    if member.size > 0 and member.size < 50 * 1024 * 1024:  # max 50MB
-                        try:
-                            f = tar.extractfile(member)
-                            if f:
-                                text = f.read().decode('utf-8', errors='replace')
-                                content.append(f'=== {member.name} ===\n{text}')
-                        except:
-                            pass
+                try:
+                    f = tar.extractfile(member)
+                    if f:
+                        text = f.read().decode('utf-8', errors='replace')
+                        content.append(f'=== {member.name} ===\n{text}')
+                except Exception:
+                    pass
     except Exception as e:
         return f'[tar extraction error: {e}]'
 
@@ -93,24 +110,19 @@ def extract_tar(tar_io):
 def extract_zip(data):
     """Extract relevant log files from zip archive."""
     content = []
-    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart', 'meminfo', 'diskstats']
-    log_exts = ['.log', '.txt', '.err', '.out', '.json']
-
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             for name in zf.namelist():
-                name_lower = name.lower()
-                is_key = any(k in name_lower for k in key_files)
-                is_log = any(name_lower.endswith(ext) for ext in log_exts)
-
-                if (is_key or is_log) and not name.endswith('/'):
-                    info = zf.getinfo(name)
-                    if info.file_size > 0 and info.file_size < 50 * 1024 * 1024:
-                        try:
-                            text = zf.read(name).decode('utf-8', errors='replace')
-                            content.append(f'=== {name} ===\n{text}')
-                        except:
-                            pass
+                if name.endswith('/'):
+                    continue
+                info = zf.getinfo(name)
+                if not should_extract_file(name, info.file_size):
+                    continue
+                try:
+                    text = zf.read(name).decode('utf-8', errors='replace')
+                    content.append(f'=== {name} ===\n{text}')
+                except Exception:
+                    pass
     except Exception as e:
         return f'[zip extraction error: {e}]'
 
@@ -161,6 +173,7 @@ def upload():
 
         return jsonify({
             'success': True,
+            'id': entry['id'],
             'filename': filename,
             'size': len(data),
             'content_size': len(content),
@@ -188,9 +201,30 @@ def history():
         ]
     })
 
+@app.route('/api/history/<int:item_id>', methods=['GET'])
+def history_item(item_id):
+    """Get a single history item by ID."""
+    now = time.time()
+    for h in upload_history:
+        if h['id'] == item_id and now - h['timestamp'] <= 86400:
+            return jsonify({
+                'id': h['id'],
+                'filename': h['filename'],
+                'size': h['size'],
+                'content_size': h['content_size'],
+                'preview': h['preview'],
+                'timestamp': h['timestamp']
+            })
+    return jsonify({'error': 'Item not found or expired'}), 404
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Proxy chat completions to DeepSeek."""
+    ip = request.remote_addr or 'unknown'
+    allowed, remaining = check_rate_limit(ip)
+    if not allowed:
+        return jsonify({'error': f'Rate limit exceeded. {RATE_LIMIT} req/{RATE_WINDOW}s per IP'}), 429
+
     if not API_KEY:
         return jsonify({'error': 'API key not configured. Set DEEPSEEK_API_KEY env'}), 401
 
@@ -226,10 +260,14 @@ def chat():
         try:
             err_json = json.loads(error_body)
             return jsonify({'error': err_json.get('error', {}).get('message', str(e))}), e.code
-        except:
+        except (json.JSONDecodeError, ValueError):
             return jsonify({'error': f'HTTP {e.code}: {error_body}'}), e.code
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.errorhandler(413)
+def too_large(e):
+    return jsonify({'error': 'File too large. Max upload size is 100MB'}), 413
 
 if __name__ == '__main__':
     print(f"LogScope starting on port {PORT}")

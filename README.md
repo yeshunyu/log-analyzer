@@ -1,4 +1,4 @@
-# LogScope v0.3rc1
+# LogScope v0.3rc2
 
 单文件 HTML 工具，用于 Linux 系统日志分析，支持 LLM 智能分析和硬件问题诊断。
 
@@ -28,7 +28,7 @@
 ### 方式二：Docker 部署
 适合团队共享或服务器长期运行：
 ```bash
-docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc1
+docker run -d -p 5000:5000 yuyeshun2/logscope:v0.3rc2
 ```
 
 或使用 docker-compose：
@@ -85,3 +85,14 @@ sudo ./linux-os-log-collect.sh
 ## License
 
 MIT
+
+---
+
+## 更新日志
+
+### v0.3rc2 (2026-05-11)
+- **安全增强**: 上传文件大小限制 (100MB)，API 限流 (20 req/min/IP)
+- **Bug 修复**: "关于"面板不显示
+- **优化**: 收集脚本与独立版本同步 (新增 dmidecode/ethtool/netstat 等)
+- **后端**: /api/history/<id> 按 ID 查历史，重复提取逻辑抽取
+- **代码质量**: 修复 bare except 异常吞没

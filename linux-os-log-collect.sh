@@ -1,5 +1,5 @@
 #!/bin/bash
-# Linux OS Log Collector v0.3rc1
+# Linux OS Log Collector v0.3rc2
 # Usage: chmod +x linux-os-log-collect.sh && sudo ./linux-os-log-collect.sh
 
 set -euo pipefail

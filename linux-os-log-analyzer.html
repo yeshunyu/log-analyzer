@@ -399,6 +399,10 @@ button.secondary:hover { background: var(--border); }
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--card-shadow);
+  z-index: 100;
+  min-width: 280px;
+}
+.about-panel.show { display: block; }
   </style>
 </head>
 <body>
@@ -420,7 +424,7 @@ button.secondary:hover { background: var(--border); }
               Linux 系统日志分析工具，支持 DeepSeek V4 智能分析和硬件问题诊断。
             </div>
             <div style="font-size:0.8em;color:var(--text-muted);margin-bottom:12px;">
-              <div style="margin-bottom:4px;">版本: v0.3rc1</div>
+              <div style="margin-bottom:4px;">版本: v0.3rc2</div>
               <div>⚠️ AI 分析结果仅供参考</div>
             </div>
             <a href="https://github.com/yeshunyu/log-analyzer" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:0.85em;text-decoration:none;">
@@ -879,15 +883,15 @@ function loadHistory() {
 
 // Load a specific history item
 function loadHistoryItem(id) {
-  fetch('/api/history')
+  fetch('/api/history/' + id)
     .then(r => r.json())
-    .then(data => {
-      const item = data.history.find(h => h.id === id);
-      if (item) {
+    .then(item => {
+      if (item && item.filename) {
         document.getElementById('logInput').value = item.preview;
         document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size) + ')';
       }
-    });
+    })
+    .catch(() => {});
 }
 
 function readFile(file) {
@@ -940,37 +944,73 @@ function generateScript(days, level) {
   L.push('# === 系统信息 ==='); L.push('uname -a > "$TMPDIR/01_system_info.txt"');
   L.push('uptime >> "$TMPDIR/01_system_info.txt"'); L.push('free -h >> "$TMPDIR/01_system_info.txt"');
   L.push('df -h >> "$TMPDIR/01_system_info.txt"'); L.push('cat /proc/cpuinfo | grep -E "model name|cpu cores" >> "$TMPDIR/01_system_info.txt" 2>/dev/null || true');
-  L.push(''); L.push('# === 实时硬件 ==='); L.push('dmesg -T > "$TMPDIR/02_dmesg.log" 2>/dev/null || dmesg > "$TMPDIR/02_dmesg.log"');
-  L.push('cat /var/log/dmesg* > "$TMPDIR/02_dmesg.old" 2>/dev/null || true'); L.push('lsblk -a > "$TMPDIR/03_block_devices.txt"');
-  L.push('cat /proc/diskstats > "$TMPDIR/04_diskstats.txt"');
+  L.push(''); L.push('# === 硬件日志 ==='); L.push('dmesg -T > "$TMPDIR/02_dmesg.log" 2>/dev/null || dmesg > "$TMPDIR/02_dmesg.log"');
+  L.push('cat /var/log/dmesg* > "$TMPDIR/02_dmesg.old" 2>/dev/null || true');
+  if (level === 'hardware' || level === 'full') {
+    L.push('dmidecode > "$TMPDIR/03_hardware.txt" 2>/dev/null || echo "[SKIP: need root]"');
+    L.push('lspci -vvv > "$TMPDIR/04_pci.txt" 2>/dev/null || echo "[SKIP: need root]"');
+  }
+  L.push('lsblk -a > "$TMPDIR/05_block_devices.txt"');
+  L.push('cat /proc/diskstats > "$TMPDIR/06_diskstats.txt"');
   if (level === 'hardware' || level === 'full') {
     L.push(''); L.push('# === SMART ===');
+    L.push('smartctl --scan > "$TMPDIR/07_smart_devices.txt" 2>/dev/null || true');
     L.push('for dev in $(lsblk -d -n -o NAME | grep -E \'^sd|^nvme\' 2>/dev/null); do');
-    L.push('  [[ -b "/dev/$dev" ]] && smartctl -a "/dev/$dev" > "$TMPDIR/05_smart_$dev.txt" 2>/dev/null || true');
-    L.push('  [[ -b "/dev/$dev" ]] && smartctl -l error "/dev/$dev" > "$TMPDIR/06_smart_err_$dev.txt" 2>/dev/null || true');
-    L.push('done'); L.push(''); L.push('# === 内存错误 ===');
-    L.push('cat /proc/meminfo > "$TMPDIR/07_memory.txt"');
-    L.push('dmesg | grep -i -E "uce|err|correctable|memory" > "$TMPDIR/08_mem_errors.txt" 2>/dev/null || true');
+    L.push('  [[ -b "/dev/$dev" ]] && smartctl -a "/dev/$dev" > "$TMPDIR/08_smart_$dev.txt" 2>/dev/null || true');
+    L.push('done');
+    L.push('cat /proc/mdstat > "$TMPDIR/09_raid_status.txt" 2>/dev/null || true');
   }
-  L.push(''); L.push('# === 网络 ==='); L.push('ip addr > "$TMPDIR/10_ip_addr.txt"');
-  L.push('ip link > "$TMPDIR/11_ip_link.txt"'); L.push('cat /proc/net/dev > "$TMPDIR/12_net_dev.txt"');
-  L.push('ss -tuln > "$TMPDIR/13_ss_ports.txt" 2>/dev/null || true');
-  L.push('dmesg | grep -i -E "optical|fiber|sfp|sfpp" > "$TMPDIR/14_optical.log" 2>/dev/null || true');
+  L.push('lsblk -f > "$TMPDIR/10_filesystems.txt"');
+  L.push(''); L.push('# === 内存 ===');
+  L.push('cat /proc/meminfo > "$TMPDIR/11_memory.txt"');
+  L.push('dmesg | grep -i -E "memory|uce|err|correctable" > "$TMPDIR/12_mem_errors.txt" 2>/dev/null || true');
   if (level === 'full') {
-    L.push(''); L.push('# === 性能采样 ===');
-    L.push('(iostat -x 2 5 > "$TMPDIR/15_iostat.txt" 2>/dev/null &)');
-    L.push('(mpstat -A 2 3 > "$TMPDIR/16_mpstat.txt" 2>/dev/null &)');
-    L.push('sleep 12'); L.push('ps aux --no-headers > "$TMPDIR/18_processes.txt"');
-    L.push('top -bn1 -o %MEM | head -30 > "$TMPDIR/19_top_mem.txt"');
+    L.push('cat /proc/buddyinfo > "$TMPDIR/13_buddyinfo.txt" 2>/dev/null || true');
+  }
+  L.push(''); L.push('# === 网络 ===');
+  L.push('ip addr > "$TMPDIR/14_ip_addr.txt"');
+  L.push('ip link > "$TMPDIR/15_ip_link.txt"');
+  L.push('ip -s link > "$TMPDIR/16_ip_link_stats.txt"');
+  L.push('cat /proc/net/dev > "$TMPDIR/17_net_dev.txt"');
+  L.push('ss -tuln > "$TMPDIR/18_ss_ports.txt" 2>/dev/null || true');
+  if (level === 'hardware' || level === 'full') {
+    L.push('NET_DEV=$(ip -o link show | grep -v lo | head -1 | awk -F: \'{print $2}\' | tr -d \' \')');
+    L.push('[[ -n "$NET_DEV" ]] && ethtool -g "$NET_DEV" > "$TMPDIR/19_ethtool_ring.txt" 2>/dev/null || true');
+  }
+  L.push(''); L.push('# === 光模块/光纤 ===');
+  L.push('ls -l /sys/class/net/ > "$TMPDIR/20_net_class.txt"');
+  L.push('cat /sys/class/net/*/speed > "$TMPDIR/21_net_speed.txt" 2>/dev/null || true');
+  L.push('dmesg | grep -i -E "optical|fiber|sfp|sfpp|sff|module|link" > "$TMPDIR/22_optical.log" 2>/dev/null || true');
+  L.push(''); L.push('# === IO/CPU 性能 ===');
+  L.push('iostat -x 2 5 > "$TMPDIR/23_iostat.txt" 2>/dev/null || echo "[iostat SKIP: need sysstat]"');
+  L.push('mpstat -A 2 3 > "$TMPDIR/24_mpstat.txt" 2>/dev/null || echo "[mpstat SKIP: need sysstat]"');
+  if (level === 'full') {
+    L.push('pidstat -u 2 5 > "$TMPDIR/25_pidstat.txt" 2>/dev/null || echo "[pidstat SKIP: need sysstat]"');
+    L.push('which nmon >/dev/null 2>&1 && nmon -f -s 1 -c 10 -m "$TMPDIR/" 2>/dev/null &');
+  }
+  L.push('sleep 12');
+  L.push('ps aux --no-headers > "$TMPDIR/26_processes.txt"');
+  L.push('top -bn1 -o %MEM | head -30 > "$TMPDIR/27_top_mem.txt"');
+  if (level === 'full') {
+    L.push('top -bn1 -o %CPU | head -30 > "$TMPDIR/28_top_cpu.txt"');
   }
   L.push(''); L.push('# === 历史日志 ===');
-  L.push('journalctl -k --since "-' + days + ' days" --no-pager > "$TMPDIR/30_kernel.log" 2>/dev/null || true');
-  L.push('journalctl -p err --since "-' + days + ' days" --no-pager > "$TMPDIR/31_errors.log" 2>/dev/null || true');
-  L.push('journalctl --since "-' + days + ' days" --no-pager > "$TMPDIR/32_journal.txt" 2>/dev/null || true');
+  L.push('journalctl -k --no-pager > "$TMPDIR/30_kernel.log" 2>/dev/null || echo "[journalctl SKIP: need root]"');
+  L.push('journalctl -p err --no-pager > "$TMPDIR/31_errors.log" 2>/dev/null || true');
+  if (level === 'full') {
+    L.push('journalctl -p warning --since "-' + days + ' days" --no-pager > "$TMPDIR/32_warnings.log" 2>/dev/null || true');
+  }
+  L.push('cp /var/log/syslog "$TMPDIR/33_syslog.txt" 2>/dev/null || true');
+  L.push('cp /var/log/messages "$TMPDIR/33_messages.txt" 2>/dev/null || true');
+  L.push(''); L.push('# === 网络连接 ===');
+  L.push('netstat -ant > "$TMPDIR/34_netstat_tcp.txt" 2>/dev/null || true');
+  L.push('netstat -anu > "$TMPDIR/35_netstat_udp.txt" 2>/dev/null || true');
+  L.push('ss -s > "$TMPDIR/36_ss_summary.txt" 2>/dev/null || true');
   L.push(''); L.push('# === 打包 ===');
   L.push('tar -czf "$DEST" -C "$(dirname "$TMPDIR")" "$(basename "$TMPDIR")"');
   L.push(''); L.push('echo "=== 完成 ==="'); L.push('echo "文件: $DEST"');
   L.push('echo "大小: $(du -h "$DEST" | cut -f1)"');
+  L.push('echo "时间: $(date)"');
   return L.join('\n');
 }
 
