@@ -77,17 +77,13 @@ def decompress_log_content(data, filename):
     return data.decode('utf-8', errors='replace')
 
 def should_extract_file(name, size=0):
-    """Check if a file from an archive is a relevant log file."""
-    # Skip hidden files (not the archive root) and known non-log directories
+    """Check if a file from an archive should be extracted (pre-content check)."""
     parts = name.replace('\\', '/').split('/')
     for part in parts:
         if part == '.' or part == '..' or not part:
             continue
         if part.startswith('.') or part == '__MACOSX':
             return False
-    skip_dirs = {'dump_info', 'dump', 'dumps', 'cache', '__MACOSX'}
-    if len(parts) > 1 and any(p.lower() in skip_dirs for p in parts[:-1]):
-        return False
 
     key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart',
                  'meminfo', 'diskstats', 'cpuinfo', 'buddyinfo', 'mdstat', 'mounts',
@@ -98,6 +94,18 @@ def should_extract_file(name, size=0):
     is_key = any(k in name_lower for k in key_files)
     is_log = any(name_lower.endswith(ext) for ext in log_exts)
     return (is_key or is_log) and 0 < size < 50 * 1024 * 1024
+
+def looks_like_log(text):
+    """Quick heuristic: skip files that are mostly numeric dumps or binary garbage."""
+    lines = text.strip().split('\n')
+    if not lines:
+        return False
+    alpha_count = sum(1 for c in text if c.isalpha())
+    total = max(len(text), 1)
+    # Skip if less than 10% alphabetic characters (pure numbers/binary)
+    if alpha_count / total < 0.10 and len(lines) > 3:
+        return False
+    return True
 
 def extract_tar(tar_io):
     """Extract relevant log files from tar archive."""
@@ -111,7 +119,8 @@ def extract_tar(tar_io):
                     f = tar.extractfile(member)
                     if f:
                         text = f.read().decode('utf-8', errors='replace')
-                        content.append(f'=== {member.name} ===\n{text}')
+                        if looks_like_log(text):
+                            content.append(f'=== {member.name} ===\n{text}')
                 except Exception:
                     pass
     except Exception as e:
@@ -134,7 +143,8 @@ def extract_zip(data):
                     continue
                 try:
                     text = zf.read(name).decode('utf-8', errors='replace')
-                    content.append(f'=== {name} ===\n{text}')
+                    if looks_like_log(text):
+                        content.append(f'=== {name} ===\n{text}')
                 except Exception:
                     pass
     except Exception as e:
