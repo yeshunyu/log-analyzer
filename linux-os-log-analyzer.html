@@ -389,6 +389,48 @@ button.secondary:hover { background: var(--border); }
   font-size: 0.85em;
   transition: all 0.2s;
 }
+/* === Archive Tree === */
+.tree-view {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+.archive-meta { color: var(--text-secondary); font-size: 0.85em; margin-bottom: 8px; }
+.file-result-block {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+}
+.file-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.file-result-header .badge {
+  background: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.file-result-empty { color: var(--text-muted); font-size: 0.85em; padding: 4px 0; }
+
 .about-btn:hover { color: var(--text-primary); border-color: var(--accent); }
 .about-panel {
   display: none;
@@ -445,6 +487,7 @@ button.secondary:hover { background: var(--border); }
     </div>
     <input type="file" id="fileInput" style="display:none" accept=".log,.txt,.tar.gz,.gz,.bz2,.xz,*">
     <textarea id="logInput" placeholder="粘贴日志内容，或上传文件..."></textarea>
+    <div id="archiveDisplay" style="display:none;"></div>
   </div>
 
   <div id="historySection" class="card" style="display:none;">
@@ -547,6 +590,7 @@ const rules = [
 ];
 
 let currentResults = [], currentLogText = '', chatHistory = [], apiBaseUrl = '';
+let currentArchive = null, currentFiles = [];
 
 function parseLine(line) {
   const regex = /^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$/;
@@ -555,42 +599,97 @@ function parseLine(line) {
 }
 
 function analyzeLogs() {
-  const input = document.getElementById('logInput').value.trim();
-  if (!input) { alert('请输入日志内容'); return; }
-  currentLogText = input; currentResults = []; chatHistory = [];
+  if (currentFiles.length > 0) {
+    doPerFileAnalysis();
+  } else {
+    const input = document.getElementById('logInput').value.trim();
+    if (!input) { alert('请输入日志内容或上传文件'); return; }
+    currentLogText = input; currentResults = []; chatHistory = [];
+    const statsDiv = document.getElementById('stats');
+    statsDiv.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span> 规则解析中...</div>';
+    document.getElementById('results').innerHTML = '';
+    doRuleAnalysis();
+    renderResults(currentResults);
+    doLLMIfEnabled(currentLogText, currentResults);
+  }
+}
 
-  // Show rule analysis progress
+function doPerFileAnalysis() {
+  currentResults = []; chatHistory = [];
+  const perFileResults = [];
   const statsDiv = document.getElementById('stats');
   const resultsDiv = document.getElementById('results');
-  statsDiv.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></span> 规则解析中...</div>';
+  statsDiv.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span> 逐文件扫描中...</div>';
   resultsDiv.innerHTML = '';
 
-  // Run rule analysis first (sync, but UI will update after this function returns)
-  doRuleAnalysis();
+  currentFiles.forEach(f => {
+    const fr = { path: f.path, size: f.size, results: [] };
+    f.content.split('\n').forEach(line => {
+      if (!line.trim()) return;
+      const p = parseLine(line);
+      rules.forEach(r => {
+        if (r.pattern.test(p.msg) || r.pattern.test(p.raw)) {
+          const hit = {...r, line: p.raw, time: p.time, host: p.host};
+          fr.results.push(hit);
+          currentResults.push(hit);
+        }
+      });
+    });
+    perFileResults.push(fr);
+  });
 
-  // Show rule results
-  renderResults(currentResults);
+  renderPerFileResults(perFileResults);
 
-  // Now handle LLM if enabled
+  // LLM
+  doLLMIfEnabled(null, currentResults, perFileResults);
+}
+
+function renderPerFileResults(perFileResults) {
+  const s = { critical: 0, warning: 0, info: 0 };
+  currentResults.forEach(r => s[r.severity]++);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card critical"><div class="num">${s.critical}</div><div class="label">严重</div></div>
+    <div class="stat-card warning"><div class="num">${s.warning}</div><div class="label">警告</div></div>
+    <div class="stat-card info"><div class="num">${s.info}</div><div class="label">信息</div></div>`;
+
+  let html = '';
+  perFileResults.forEach(fr => {
+    html += `<div class="file-result-block">
+      <div class="file-result-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <span>${escapeHtml(fr.path)} <span class="badge">${fr.results.length} 条 / ${formatSize(fr.size)}</span></span>
+        <span style="font-size:0.8em;opacity:0.6;">▼</span>
+      </div>
+      <div class="file-result-body">`;
+    if (fr.results.length === 0) {
+      html += '<div class="file-result-empty">未检测到问题</div>';
+    } else {
+      html += fr.results.map(r => `
+        <div class="issue-card ${r.severity}" style="margin:6px 0;">
+          <div class="header">
+            <span>${r.time ? `<span class="time">${r.time}</span> ` : ''}[${r.category}]</span>
+            <span class="tag ${r.severity}">${r.severity}</span>
+          </div>
+          <div class="content">${escapeHtml(r.line)}</div>
+          <div class="suggestion">${r.suggestion}</div>
+        </div>`).join('');
+    }
+    html += '</div></div>';
+  });
+  document.getElementById('results').innerHTML = html;
+}
+
+function doLLMIfEnabled(logText, ruleResults, perFileResults) {
   const useLLM = document.getElementById('useLLM').checked;
   const llmSummary = document.getElementById('llmSummary');
-
-  if (useLLM) {
-    const apiKey = document.getElementById('apiKey').value.trim();
-    if (!apiKey) {
-      llmSummary.style.display = 'none';
-      alert('请先输入 API Key');
-      return;
-    }
-    document.getElementById('mainBtn').disabled = true;
-    llmSummary.style.display = 'block';
-    llmSummary.innerHTML = '<h3><span class="spinner"></span> AI 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
-    document.getElementById('chatSection').style.display = 'block';
-    document.getElementById('chatMessages').innerHTML = '';
-    callLLM(currentLogText, currentResults);
-  } else {
-    document.getElementById('mainBtn').disabled = false;
-  }
+  if (!useLLM) { document.getElementById('mainBtn').disabled = false; return; }
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { llmSummary.style.display = 'none'; alert('请先输入 API Key'); return; }
+  document.getElementById('mainBtn').disabled = true;
+  llmSummary.style.display = 'block';
+  llmSummary.innerHTML = '<h3><span class="spinner"></span> AI 分析中...</h3><pre>正在调用大模型进行分析...</pre>';
+  document.getElementById('chatSection').style.display = 'block';
+  document.getElementById('chatMessages').innerHTML = '';
+  callLLM(logText, ruleResults, perFileResults);
 }
 
 function doRuleAnalysis() {
@@ -627,7 +726,7 @@ function getApiUrl() {
   return u.endsWith('/v1/chat/completions') ? u : u + '/v1/chat/completions';
 }
 
-async function callLLM(logText, ruleResults) {
+async function callLLM(logText, ruleResults, perFileResults) {
   try {
     const apiKey = document.getElementById('apiKey').value.trim();
     if (!apiKey) { alert('请先输入 API Key'); return; }
@@ -638,23 +737,33 @@ async function callLLM(logText, ruleResults) {
     const model = document.getElementById('modelSelect').value;
     const summaryDiv = document.getElementById('llmSummary');
 
-    // Build rule analysis summary
-    const ruleSummary = ruleResults && ruleResults.length > 0
-      ? `规则匹配发现 ${ruleResults.length} 个问题：\n` +
+    let ruleSummary;
+    if (perFileResults && perFileResults.length > 0) {
+      ruleSummary = `逐文件扫描完成，共 ${ruleResults.length} 个问题：\n` +
         `严重: ${ruleResults.filter(r => r.severity === 'critical').length} | ` +
         `警告: ${ruleResults.filter(r => r.severity === 'warning').length} | ` +
         `信息: ${ruleResults.filter(r => r.severity === 'info').length}\n\n` +
-        ruleResults.slice(0, 20).map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 100)}`).join('\n')
-      : '规则匹配未发现问题。';
+        perFileResults.filter(fr => fr.results.length > 0).map(fr =>
+          `### ${fr.path} (${fr.results.length}条)\n` +
+          fr.results.map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 120)}`).join('\n')
+        ).join('\n\n');
+    } else {
+      ruleSummary = ruleResults && ruleResults.length > 0
+        ? `规则匹配发现 ${ruleResults.length} 个问题：\n` +
+          `严重: ${ruleResults.filter(r => r.severity === 'critical').length} | ` +
+          `警告: ${ruleResults.filter(r => r.severity === 'warning').length} | ` +
+          `信息: ${ruleResults.filter(r => r.severity === 'info').length}\n\n` +
+          ruleResults.slice(0, 20).map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 100)}`).join('\n')
+        : '规则匹配未发现问题。';
+    }
 
     const prompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
-请分析以下系统日志，识别: 1)硬件故障(硬盘/光模块/内存UCE) 2)性能问题 3)系统错误
+请基于以下逐文件扫描结果进行分析，识别: 1)硬件故障(硬盘/光模块/内存UCE) 2)性能问题 3)系统错误
 
-## 规则匹配结果（已自动解析）
+## 逐文件扫描结果
 ${ruleSummary}
 
-## 日志内容
-日志内容: ${logText.slice(0,8000)}
+${logText ? '## 日志原文\n' + logText.slice(0, 4000) : ''}
 输出: ##问题概述 ##硬件问题 ##性能分析 ##优化建议 ##监控指标`;
 
     const url = getApiUrl();
@@ -690,7 +799,11 @@ async function sendChat() {
   msgsDiv.appendChild(loading); msgsDiv.scrollTop = msgsDiv.scrollHeight;
   try {
     const model = document.getElementById('modelSelect').value;
-    const systemPrompt = `你是Linux服务器运维专家。当前日志:\n${currentLogText ? currentLogText.slice(0,3000) : ''}\n请结合上下文回答。`;
+    const systemPrompt = currentFiles.length > 0
+      ? `你是Linux服务器运维专家。已分析 ${currentFiles.length} 个文件，扫描到 ${currentResults.length} 个问题。\n${
+          currentResults.slice(0, 30).map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 100)}`).join('\n')
+        }\n请结合上下文回答。`
+      : `你是Linux服务器运维专家。当前日志:\n${currentLogText ? currentLogText.slice(0, 3000) : ''}\n请结合上下文回答。`;
     const url = getApiUrl();
     const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
     const body = JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...chatHistory], temperature: 0.3, max_tokens: 1500 });
@@ -709,12 +822,15 @@ function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 
 function clearAll() {
   document.getElementById('logInput').value = '';
+  document.getElementById('logInput').style.display = '';
+  document.getElementById('archiveDisplay').style.display = 'none';
   document.getElementById('results').innerHTML = '';
   document.getElementById('stats').innerHTML = '';
   document.getElementById('llmSummary').style.display = 'none';
   document.getElementById('chatSection').style.display = 'none';
   document.getElementById('fileInfo').innerHTML = '拖拽日志文件到此处，或点击选择文件';
   currentResults = []; currentLogText = ''; chatHistory = [];
+  currentArchive = null; currentFiles = [];
 }
 
 function exportReport() {
@@ -887,8 +1003,17 @@ function loadHistoryItem(id) {
     .then(r => r.json())
     .then(item => {
       if (item && item.filename) {
-        document.getElementById('logInput').value = item.preview;
-        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size) + ')';
+        clearAll();
+        if (item.is_archive) {
+          document.getElementById('logInput').style.display = 'none';
+          document.getElementById('archiveDisplay').style.display = 'block';
+          document.getElementById('archiveDisplay').innerHTML = '<pre class="tree-view">' + escapeHtml(item.preview) + '</pre>';
+          currentArchive = item;
+        } else {
+          document.getElementById('logInput').value = item.preview;
+          currentLogText = item.preview;
+        }
+        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size || 0) + ')';
       }
     })
     .catch(() => {});
@@ -903,8 +1028,33 @@ function readFile(file) {
     .then(r => r.json())
     .then(data => {
       if (data.success) {
-        document.getElementById('logInput').value = data.content || data.preview;
-        fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(file.size) + ') → ' + formatSize((data.content || data.preview || '').length) + ')';
+        if (data.type === 'archive') {
+          currentArchive = data;
+          currentFiles = data.files;
+          currentLogText = '';
+          currentResults = []; chatHistory = [];
+          document.getElementById('logInput').style.display = 'none';
+          document.getElementById('logInput').value = '';
+          document.getElementById('results').innerHTML = '';
+          document.getElementById('stats').innerHTML = '';
+          document.getElementById('llmSummary').style.display = 'none';
+          const archiveDiv = document.getElementById('archiveDisplay');
+          archiveDiv.style.display = 'block';
+          archiveDiv.innerHTML = `<div style="margin-bottom:8px;color:var(--accent);font-weight:600;">${escapeHtml(data.filename)} <span style="color:var(--text-secondary);font-weight:400;font-size:0.85em;">(${data.file_count} 个文件, ${formatSize(data.size)})</span></div>
+            <pre class="tree-view">${escapeHtml(data.tree)}</pre>`;
+          fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(data.filename) + '</strong> — ' + data.file_count + ' 个文件';
+        } else {
+          currentArchive = null;
+          currentFiles = [];
+          currentLogText = data.content;
+          document.getElementById('archiveDisplay').style.display = 'none';
+          document.getElementById('logInput').style.display = '';
+          document.getElementById('logInput').value = data.content;
+          document.getElementById('results').innerHTML = '';
+          document.getElementById('stats').innerHTML = '';
+          document.getElementById('llmSummary').style.display = 'none';
+          fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已上传: <strong>' + escapeHtml(file.name) + '</strong> (' + formatSize(data.content_size) + ')';
+        }
       } else {
         fileInfo.innerHTML = '<span style="color:var(--danger)">解压失败: ' + escapeHtml(data.error || '未知错误') + '</span>';
       }

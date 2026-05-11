@@ -45,10 +45,14 @@ def check_rate_limit(ip):
     return True, RATE_LIMIT - len(_rate_limits[ip])
 
 def decompress_log_content(data, filename):
-    """Decompress and extract log content from various formats."""
+    """Decompress and extract log content from various formats.
+    Returns:
+      - plain text: str
+      - archive: dict {tree, files: [{path, content, size}, ...]}
+    """
     name = filename.lower()
 
-    # gzip
+    # gzip (single file)
     if name.endswith('.gz') and not name.endswith('.tar.gz'):
         content = gzip.decompress(data)
         return content.decode('utf-8', errors='replace')
@@ -63,96 +67,122 @@ def decompress_log_content(data, filename):
 
     # tar.gz / tgz
     if name.endswith('.tar.gz') or name.endswith('.tgz'):
-        return extract_tar(io.BytesIO(gzip.decompress(data)))
+        return extract_archive(io.BytesIO(gzip.decompress(data)), 'tar', filename)
 
     # tar (uncompressed)
     if name.endswith('.tar'):
-        return extract_tar(io.BytesIO(data))
+        return extract_archive(io.BytesIO(data), 'tar', filename)
 
     # zip
     if name.endswith('.zip'):
-        return extract_zip(data)
+        return extract_archive(io.BytesIO(data), 'zip', filename)
 
     # plain text - try decode
     return data.decode('utf-8', errors='replace')
 
-def should_extract_file(name, size=0):
-    """Check if a file from an archive should be extracted (pre-content check)."""
-    parts = name.replace('\\', '/').split('/')
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB per extracted file
+
+def is_skippable(parts):
+    """Skip hidden, system, and non-text files by path."""
     for part in parts:
-        if part == '.' or part == '..' or not part:
+        if not part or part == '.':
             continue
         if part.startswith('.') or part == '__MACOSX':
-            return False
+            return True
+    return False
 
-    key_files = ['dmesg', 'syslog', 'messages', 'journal', 'kernel', 'errors', 'smart',
-                 'meminfo', 'diskstats', 'cpuinfo', 'buddyinfo', 'mdstat', 'mounts',
-                 'filesystems', 'raid', 'pci', 'lspci', 'ethtool', 'netstat', 'ss_',
-                 'processes', 'top_mem', 'top_cpu', 'pidstat', 'nmon', 'sysctl']
-    log_exts = ['.log', '.txt', '.err', '.out', '.json']
-    name_lower = name.lower()
-    is_key = any(k in name_lower for k in key_files)
-    is_log = any(name_lower.endswith(ext) for ext in log_exts)
-    return (is_key or is_log) and 0 < size < 50 * 1024 * 1024
+def build_tree(files):
+    """Build a tree-style string from file paths."""
+    # Group files by directory
+    tree = {}
+    for f in sorted(files, key=lambda x: x['path']):
+        parts = f['path'].replace('\\', '/').split('/')
+        node = tree
+        for i, p in enumerate(parts):
+            if i == len(parts) - 1:
+                node[p] = f['size']
+            else:
+                if p not in node:
+                    node[p] = {}
+                node = node[p]
 
-def looks_like_log(text):
-    """Quick heuristic: skip files that are mostly numeric dumps or binary garbage."""
-    lines = text.strip().split('\n')
-    if not lines:
-        return False
-    alpha_count = sum(1 for c in text if c.isalpha())
-    total = max(len(text), 1)
-    # Skip if less than 10% alphabetic characters (pure numbers/binary)
-    if alpha_count / total < 0.10 and len(lines) > 3:
-        return False
-    return True
+    lines = []
+    def _render(node, prefix, is_last):
+        items = list(node.items())
+        for i, (name, val) in enumerate(items):
+            is_item_last = (i == len(items) - 1)
+            connector = '└── ' if is_item_last else '├── '
+            if isinstance(val, dict):
+                lines.append(prefix + connector + name + '/')
+                _render(val, prefix + ('    ' if is_item_last else '│   '), is_item_last)
+            else:
+                size_str = format_bytes(val)
+                lines.append(prefix + connector + f'{name} ({size_str})')
 
-def extract_tar(tar_io):
-    """Extract relevant log files from tar archive."""
-    content = []
+    _render(tree, '', True)
+    return '\n'.join(lines)
+
+def format_bytes(b):
+    if b < 1024:
+        return f'{b} B'
+    if b < 1024 * 1024:
+        return f'{b / 1024:.1f} KB'
+    return f'{b / 1024 / 1024:.1f} MB'
+
+def extract_archive(io_obj, fmt, filename):
+    """Extract ALL files from an archive. Returns {tree, files}."""
+    result = []
+    max_files = 200
+
     try:
-        with tarfile.open(fileobj=tar_io) as tar:
-            for member in tar.getmembers():
-                if not member.isfile() or not should_extract_file(member.name, member.size):
-                    continue
-                try:
-                    f = tar.extractfile(member)
-                    if f:
-                        text = f.read().decode('utf-8', errors='replace')
-                        if looks_like_log(text):
-                            content.append(f'=== {member.name} ===\n{text}')
-                except Exception:
-                    pass
+        if fmt == 'tar':
+            with tarfile.open(fileobj=io_obj) as tar:
+                for member in tar.getmembers():
+                    if not member.isfile():
+                        continue
+                    if member.size == 0 or member.size > MAX_FILE_SIZE:
+                        continue
+                    path = member.name.lstrip('./')
+                    if is_skippable(path.replace('\\', '/').split('/')):
+                        continue
+                    if len(result) >= max_files:
+                        break
+                    try:
+                        f = tar.extractfile(member)
+                        if f:
+                            text = f.read().decode('utf-8', errors='replace')
+                            result.append({'path': path, 'content': text, 'size': len(text)})
+                    except Exception:
+                        pass
+        else:  # zip
+            with zipfile.ZipFile(io_obj) as zf:
+                for name in zf.namelist():
+                    if name.endswith('/'):
+                        continue
+                    info = zf.getinfo(name)
+                    if info.file_size == 0 or info.file_size > MAX_FILE_SIZE:
+                        continue
+                    path = name.lstrip('/')
+                    if is_skippable(path.replace('\\', '/').split('/')):
+                        continue
+                    if len(result) >= max_files:
+                        break
+                    try:
+                        text = zf.read(name).decode('utf-8', errors='replace')
+                        result.append({'path': path, 'content': text, 'size': len(text)})
+                    except Exception:
+                        pass
     except Exception as e:
-        return f'[tar extraction error: {e}]'
+        return {'tree': f'[extraction error: {e}]', 'files': [], 'error': str(e)}
 
-    if not content:
-        return '[no log files found in archive]'
-    return '\n\n'.join(content)
+    if not result:
+        return {'tree': '(empty archive)', 'files': []}
 
-def extract_zip(data):
-    """Extract relevant log files from zip archive."""
-    content = []
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            for name in zf.namelist():
-                if name.endswith('/'):
-                    continue
-                info = zf.getinfo(name)
-                if not should_extract_file(name, info.file_size):
-                    continue
-                try:
-                    text = zf.read(name).decode('utf-8', errors='replace')
-                    if looks_like_log(text):
-                        content.append(f'=== {name} ===\n{text}')
-                except Exception:
-                    pass
-    except Exception as e:
-        return f'[zip extraction error: {e}]'
-
-    if not content:
-        return '[no log files found in archive]'
-    return '\n\n'.join(content)
+    return {
+        'tree': build_tree(result),
+        'files': result,
+        'file_count': len(result)
+    }
 
 @app.route('/')
 def index():
@@ -182,27 +212,54 @@ def upload():
         while upload_history and now - upload_history[0]['timestamp'] > 86400:
             upload_history.pop(0)
 
-        # Add to history
-        entry = {
-            'id': int(now * 1000),
-            'filename': filename,
-            'size': len(data),
-            'content_size': len(content),
-            'preview': content[:500] if len(content) > 500 else content,
-            'timestamp': now
-        }
-        upload_history.append(entry)
+        if isinstance(content, dict):
+            # Archive: tree + files
+            entry = {
+                'id': int(now * 1000),
+                'filename': filename,
+                'size': len(data),
+                'is_archive': True,
+                'file_count': content.get('file_count', 0),
+                'tree': content.get('tree', ''),
+                'preview': content.get('tree', ''),
+                'timestamp': now
+            }
+            upload_history.append(entry)
 
-        entry['preview'] = entry['preview'][:200] + '...' if len(entry['preview']) > 200 else entry['preview']
+            return jsonify({
+                'success': True,
+                'id': entry['id'],
+                'type': 'archive',
+                'filename': filename,
+                'size': len(data),
+                'tree': content.get('tree', ''),
+                'files': content.get('files', []),
+                'file_count': content.get('file_count', 0),
+                'error': content.get('error', '')
+            })
+        else:
+            # Plain text
+            entry = {
+                'id': int(now * 1000),
+                'filename': filename,
+                'size': len(data),
+                'is_archive': False,
+                'content_size': len(content),
+                'preview': content[:500] if len(content) > 500 else content,
+                'timestamp': now
+            }
+            upload_history.append(entry)
 
-        return jsonify({
-            'success': True,
-            'id': entry['id'],
-            'filename': filename,
-            'size': len(data),
-            'content_size': len(content),
-            'preview': content[:500] if len(content) > 500 else content
-        })
+            return jsonify({
+                'success': True,
+                'id': entry['id'],
+                'type': 'text',
+                'filename': filename,
+                'size': len(data),
+                'content': content,
+                'content_size': len(content),
+                'preview': content[:500] if len(content) > 500 else content
+            })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
