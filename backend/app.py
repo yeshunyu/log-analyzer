@@ -92,18 +92,22 @@ def is_skippable(parts):
     return False
 
 def build_tree(files, max_depth=3):
-    """Build a tree-style string from file paths, showing only directories up to max_depth levels."""
-    # Group files by directory, count files at each level
-    tree = {}
+    """Build a tree-style string from file paths, showing directories and files."""
+    # Build a tree structure and track files at each level
+    tree = {}  # path -> {files: [], dirs: {}}
     file_counts = {}  # path -> count of files under that path
 
     for f in sorted(files, key=lambda x: x['path']):
         parts = f['path'].replace('\\', '/').split('/')
         node = tree
-        # Track file count for each directory level
+        # Build directory structure and track file for each level
         for i, p in enumerate(parts):
             if i == len(parts) - 1:
-                # It's a file, increment file counts for all parent paths
+                # It's a file
+                if 'files' not in node:
+                    node['files'] = []
+                node['files'].append({'name': p, 'path': f['path'], 'size': f.get('size', 0)})
+                # Increment file counts for all parent paths
                 for j in range(1, len(parts)):
                     parent = '/'.join(parts[:j])
                     file_counts[parent] = file_counts.get(parent, 0) + 1
@@ -115,9 +119,14 @@ def build_tree(files, max_depth=3):
 
     lines = []
     def _render(node, prefix, is_last, depth, parent_path):
-        items = list(node.items())
+        # First render directories
+        dirs = {k: v for k, v in node.items() if k != 'files'}
+        files_list = node.get('files', [])
+        items = list(dirs.items())
+        has_more = False
+
         for i, (name, val) in enumerate(items):
-            is_item_last = (i == len(items) - 1)
+            is_item_last = (i == len(items) - 1) and not files_list
             connector = '└── ' if is_item_last else '├── '
             current_path = (parent_path + '/' + name).lstrip('/')
             if isinstance(val, dict) and depth < max_depth:
@@ -130,9 +139,57 @@ def build_tree(files, max_depth=3):
                 fc = file_counts.get(current_path, 0)
                 if fc > 0:
                     lines.append(prefix + connector + name + '/ (' + str(fc) + ' 文件)')
+        # Then render files at this level
+        for i, finfo in enumerate(files_list):
+            is_item_last = (i == len(files_list) - 1)
+            connector = '└── ' if is_item_last else '├── '
+            lines.append(prefix + connector + finfo['name'])
 
     _render(tree, '', True, 0, '')
     return '\n'.join(lines)
+
+def build_tree_json(files, max_depth=3, max_files_per_dir=50):
+    """Build an interactive tree structure (JSON) with directories and files.
+    Returns nested dict: {name, path, type:'dir'|'file', size, children:[...]}
+    """
+    # Build tree structure
+    root = {'name': '', 'path': '', 'type': 'dir', 'children': {}}
+
+    for f in sorted(files, key=lambda x: x['path']):
+        parts = f['path'].replace('\\', '/').split('/')
+        node = root
+        for i, p in enumerate(parts):
+            if i == len(parts) - 1:
+                # It's a file
+                if p not in node['children']:
+                    node['children'][p] = {'name': p, 'path': f['path'], 'type': 'file', 'size': f['size'], 'children': {}}
+                break
+            else:
+                if p not in node['children']:
+                    node['children'][p] = {'name': p, 'path': '/'.join(parts[:i+1]), 'type': 'dir', 'children': {}}
+                node = node['children'][p]
+
+    def simplify(node):
+        """Convert children dict to sorted list, cap files per dir."""
+        children = []
+        dirs, files = [], []
+        for c in node['children'].values():
+            if c['type'] == 'dir':
+                dirs.append(simplify(c))
+            else:
+                files.append(c)
+        # Sort: dirs first, then files, alphabetically
+        dirs.sort(key=lambda x: x['name'].lower())
+        files.sort(key=lambda x: x['name'].lower())
+        # Cap files if too many
+        if len(files) > max_files_per_dir:
+            shown = files[:max_files_per_dir]
+            rest = files[max_files_per_dir:]
+            shown.append({'name': f'... 还有 {len(rest)} 个文件', 'path': '', 'type': 'more', 'size': 0, 'children': {}})
+            files = shown
+        return {'name': node['name'], 'path': node['path'], 'type': node['type'], 'size': node.get('size', 0), 'children': dirs + files}
+
+    return simplify(root)
 
 def format_bytes(b):
     if b < 1024:
@@ -192,6 +249,7 @@ def extract_archive(io_obj, fmt, filename):
 
     return {
         'tree': build_tree(result),
+        'tree_json': build_tree_json(result),
         'files': result,
         'file_count': len(result)
     }
@@ -245,6 +303,7 @@ def upload():
                 'filename': filename,
                 'size': len(data),
                 'tree': content.get('tree', ''),
+                'tree_json': content.get('tree_json'),
                 'files': content.get('files', []),
                 'file_count': content.get('file_count', 0),
                 'error': content.get('error', '')

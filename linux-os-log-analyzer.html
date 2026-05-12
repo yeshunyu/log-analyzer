@@ -668,6 +668,7 @@ function doPerFileAnalysis() {
 }
 
 function renderPerFileResults(perFileResults) {
+  buildPerFileResultsMap(perFileResults);
   const s = { critical: 0, warning: 0, info: 0 };
   currentResults.forEach(r => s[r.severity]++);
 
@@ -869,38 +870,55 @@ async function callLLM(logText, ruleResults, perFileResults) {
     const model = document.getElementById('modelSelect').value;
     const summaryDiv = document.getElementById('llmSummary');
 
-    let ruleSummary;
-    if (perFileResults && perFileResults.length > 0) {
-      ruleSummary = `逐文件扫描完成，共 ${ruleResults.length} 个问题：\n` +
-        `严重: ${ruleResults.filter(r => r.severity === 'critical').length} | ` +
-        `警告: ${ruleResults.filter(r => r.severity === 'warning').length} | ` +
-        `信息: ${ruleResults.filter(r => r.severity === 'info').length}\n\n` +
-        perFileResults.filter(fr => fr.results.length > 0).map(fr =>
-          `### ${fr.path} (${fr.results.length}条)\n` +
-          fr.results.map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 120)}`).join('\n')
-        ).join('\n\n');
-    } else {
-      ruleSummary = ruleResults && ruleResults.length > 0
-        ? `规则匹配发现 ${ruleResults.length} 个问题：\n` +
-          `严重: ${ruleResults.filter(r => r.severity === 'critical').length} | ` +
-          `警告: ${ruleResults.filter(r => r.severity === 'warning').length} | ` +
-          `信息: ${ruleResults.filter(r => r.severity === 'info').length}\n\n` +
-          ruleResults.slice(0, 20).map(r => `[${r.severity.toUpperCase()}] ${r.category}: ${r.line.slice(0, 100)}`).join('\n')
-        : '规则匹配未发现问题。';
-    }
+    // Build aggregated summary grouped by severity+category
+    const probCats = {};
+    ruleResults.forEach(r => {
+      const key = r.severity + ':' + r.category;
+      if (!probCats[key]) probCats[key] = { severity: r.severity, category: r.category, count: 0, lines: [] };
+      probCats[key].count++;
+      if (probCats[key].lines.length < 3) probCats[key].lines.push(r.line.slice(0, 120));
+    });
+    const catSummary = Object.values(probCats).map(c =>
+      `[${c.severity.toUpperCase()}] ${c.category} (${c.count}处)\n` + c.lines.map(l => '  ' + l).join('\n')
+    ).join('\n');
+
+    const probCount = ruleResults.length;
+    const critCount = ruleResults.filter(r => r.severity === 'critical').length;
+    const warnCount = ruleResults.filter(r => r.severity === 'warning').length;
+    const infoCount = ruleResults.filter(r => r.severity === 'info').length;
 
     const prompt = `你是Linux服务器运维专家，擅长硬件问题诊断（硬盘慢盘、光模块异常、内存UCE错误等）和性能优化。
-请基于以下逐文件扫描结果进行分析，识别: 1)硬件故障(硬盘/光模块/内存UCE) 2)性能问题 3)系统错误
+请基于以下扫描结果进行综合分析，给出结构化报告。
 
-## 逐文件扫描结果
-${ruleSummary}
+## 扫描结果统计
+- 总问题数: ${probCount}
+- 严重: ${critCount} | 警告: ${warnCount} | 信息: ${infoCount}
+- 涉及文件: ${perFileResults ? perFileResults.filter(f => f.results.length > 0).length : 0} 个
 
-${logText ? '## 日志原文\n' + logText.slice(0, 4000) : ''}
-输出: ##问题概述 ##硬件问题 ##性能分析 ##优化建议 ##监控指标`;
+## 问题分类汇总
+${catSummary || '规则匹配未发现问题。'}
+
+## 输出要求（完整输出，不要省略任何章节）
+请依次输出以下五个章节，每个章节内容要完整：
+
+### 1. 问题概述
+（对整体情况进行概述，识别主要问题类型和影响范围）
+
+### 2. 硬件问题
+（详细列出检测到的硬件故障，包括具体错误、涉及设备、严重程度）
+
+### 3. 性能分析
+（分析系统资源使用情况、性能瓶颈）
+
+### 4. 优化建议
+（针对发现的问题给出具体的优化方案）
+
+### 5. 监控指标
+（建议重点监控的指标和告警阈值）`;
 
     const url = getApiUrl();
     const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
-    const body = JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 2500 });
+    const body = JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 4000 });
 
     const resp = await fetch(url, { method: 'POST', headers, body });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `API错误: ${resp.status}`); }
@@ -954,30 +972,35 @@ function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 
 function renderMarkdown(text) {
   if (!text) return '';
-  // 先处理 markdown 语法，再转义剩余 HTML 字符
+  // 简单方案：把 markdown 转成 HTML，但先保护已有的 HTML 标签
+  // 保存所有 HTML 标签
+  const tags = [];
+  let idx = 0;
+  text = text.replace(/<[^>]+>/g, m => { tags.push(m); return '\x00TAG' + (idx++) + '\x00'; });
+  // 保存 HTML 实体
+  const ents = [];
+  text = text.replace(/&[a-zA-Z#0-9]+;/g, m => { ents.push(m); return '\x00ENT' + (ents.length - 1) + '\x00'; });
+  // 现在 text 里只有纯文本和 markdown 语法
   // 代码块
-  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre style="background:var(--bg-primary);padding:12px;border-radius:6px;overflow-x:auto;font-size:0.85em;margin:8px 0;"><code>${code.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</code></pre>`);
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, __, code) => '<pre><code>' + code.trim().replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>');
   // 行内代码
-  text = text.replace(/`([^`]+)`/g, (_, c) => `<code style="background:var(--bg-primary);padding:1px 5px;border-radius:3px;font-size:0.85em;">${c.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code>`);
-  // 标题 ## / ###
-  text = text.replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--accent);font-size:0.95em;">$1</h4>');
-  text = text.replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 6px;color:var(--accent);font-size:1.05em;border-bottom:1px solid var(--border);padding-bottom:4px;">$1</h3>');
+  text = text.replace(/`([^`]+)`/g, (_, c) => '<code>' + c.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
+  // 标题
+  text = text.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  text = text.replace(/^# (.+)$/gm, '<h2>$1</h2>');
   // 粗体
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   // 列表
-  text = text.replace(/^[•\-*] (.+)$/gm, '<li style="margin:2px 0 2px 16px;">$1</li>');
-  text = text.replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:4px 0;padding-left:8px;">${m}</ul>`);
+  text = text.replace(/^[ \t]*[-*] (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/(<li>.*<\/li>)+/gs, m => '<ul>' + m + '</ul>');
   // 换行
   text = text.replace(/\n/g, '<br>');
-  // 最后转义剩余 HTML 字符（不在标签和实体内的）
-  // 用占位符保护已转换的标签
-  const _PLACEHOLDER = '\x00PH\x00';
-  text = text.replace(/<[^>]+>/g, m => _PLACEHOLDER + btoa(m) + _PLACEHOLDER);
-  text = text.replace(/&[a-z]+;/gi, m => _PLACEHOLDER + btoa(m) + _PLACEHOLDER);
+  // 转义剩余 HTML 特殊字符
   text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // 恢复保护的标签和实体
-  text = text.replace(new RegExp(_PLACEHOLDER + '([^' + _PLACEHOLDER + ']+)' + _PLACEHOLDER, 'g'), (_, x) => atob(x));
+  // 恢复标签和实体
+  for (let i = 0; i < tags.length; i++) text = text.replace('\x00TAG' + i + '\x00', tags[i]);
+  for (let i = 0; i < ents.length; i++) text = text.replace('\x00ENT' + i + '\x00', ents[i]);
   return text;
 }
 
@@ -1211,7 +1234,7 @@ function readFile(file) {
           document.getElementById('archivePanel').style.display = 'block';
           const archiveDiv = document.getElementById('archiveDisplay');
           archiveDiv.innerHTML = `<div style="margin-bottom:6px;color:var(--accent);font-weight:600;font-size:0.85em;">${escapeHtml(data.filename)} <span style="color:var(--text-secondary);font-weight:400;">(${data.file_count} 文件)</span></div>
-            <pre class="tree-view">${escapeHtml(data.tree)}</pre>`;
+            ${data.tree_json ? renderInteractiveTree(data.tree_json) : '<pre class="tree-view">' + escapeHtml(data.tree) + '</pre>'}`;
           fileInfo.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 已解压: <strong>' + escapeHtml(data.filename) + '</strong> — ' + data.file_count + ' 个文件';
           // 自动触发 per-file 扫描并显示结果
           doPerFileAnalysis();
@@ -1243,6 +1266,86 @@ function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function renderInteractiveTree(treeData) {
+  // Build a map of path -> file info (for quick lookup)
+  const fileMap = {};
+  if (currentFiles) {
+    currentFiles.forEach(f => { fileMap[f.path] = f; });
+  }
+
+  function renderNode(node, depth) {
+    if (node.type === 'file') {
+      const fi = fileMap[node.path] || {};
+      const issueCount = (window._perFileResults || {})[node.path] || 0;
+      const issueClass = issueCount > 0 ? (issueCount >= 3 ? 'critical' : issueCount >= 1 ? 'warning' : '') : '';
+      return `<div class="tree-file" data-path="${escapeHtml(node.path)}" style="padding:2px 8px;padding-left:${depth * 16 + 8}px;cursor:pointer;font-size:0.82em;border-radius:4px;margin:1px 0;white-space:nowrap;" onclick="handleTreeFileClick('${escapeHtml(node.path.replace(/'/g, "\\'"))}')">
+        <span style="color:var(--text-muted);margin-right:4px;">📄</span><span class="tree-file-name ${issueClass}">${escapeHtml(node.name)}</span> <span style="color:var(--text-muted);font-size:0.9em;">(${formatSize(node.size)})</span>${issueCount > 0 ? `<span class="badge" style="margin-left:4px;">${issueCount}条</span>` : ''}
+      </div>`;
+    } else if (node.type === 'dir') {
+      const children = node.children || [];
+      const hasChildren = children.length > 0;
+      let html = `<div class="tree-dir" data-path="${escapeHtml(node.path)}" style="padding:2px 8px;padding-left:${depth * 16 + 8}px;cursor:pointer;font-size:0.82em;border-radius:4px;margin:1px 0;white-space:nowrap;user-select:none;" onclick="handleTreeDirClick(this)">
+        <span class="tree-toggle" style="display:inline-block;width:12px;color:var(--text-muted);">${hasChildren ? '▶' : ''}</span><span style="color:var(--accent);">${escapeHtml(node.name)}/</span> <span style="color:var(--text-muted);font-size:0.9em;">(${children.length}项)</span>
+      </div>`;
+      if (hasChildren) {
+        html += `<div class="tree-children" style="display:none;">`;
+        children.forEach(c => { html += renderNode(c, depth + 1); });
+        html += `</div>`;
+      }
+      return html;
+    } else if (node.type === 'more') {
+      return `<div style="padding:2px 8px;padding-left:${depth * 16 + 20}px;font-size:0.82em;color:var(--text-muted);">${escapeHtml(node.name)}</div>`;
+    }
+    return '';
+  }
+
+  return `<div style="font-family:monospace;font-size:0.82em;">${renderNode(treeData, 0)}</div>`;
+}
+
+function handleTreeDirClick(el) {
+  const children = el.nextElementSibling;
+  if (children && children.classList.contains('tree-children')) {
+    const isHidden = children.style.display === 'none';
+    children.style.display = isHidden ? 'block' : 'none';
+    const toggle = el.querySelector('.tree-toggle');
+    if (toggle) toggle.textContent = isHidden ? '▼' : '▶';
+  }
+}
+
+function handleTreeFileClick(path) {
+  // Highlight selected file
+  document.querySelectorAll('.tree-file').forEach(el => el.style.background = '');
+  document.querySelectorAll('.tree-file-name').forEach(el => el.style.fontWeight = '');
+  const sel = document.querySelector(`.tree-file[data-path="${path.replace(/"/g, '\\"')}"]`);
+  if (sel) {
+    sel.style.background = 'var(--bg-tertiary)';
+    sel.style.fontWeight = '600';
+    sel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  // Find file results and scroll to it
+  const results = document.querySelectorAll('.file-result-block');
+  for (const block of results) {
+    const header = block.querySelector('.file-result-header');
+    if (header && header.textContent.includes(path)) {
+      block.style.border = '1px solid var(--accent)';
+      block.style.background = 'var(--bg-tertiary)';
+      block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Expand it
+      const body = block.querySelector('.file-result-body');
+      if (body) body.style.display = 'block';
+      setTimeout(() => { block.style.border = ''; block.style.background = ''; }, 2000);
+      break;
+    }
+  }
+}
+
+// Build per-file results map for tree highlighting
+function buildPerFileResultsMap(perFileResults) {
+  const m = {};
+  perFileResults.forEach(fr => { m[fr.path] = fr.results.length; });
+  window._perFileResults = m;
 }
 
 document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
