@@ -1,8 +1,8 @@
 {
-  "pid": 18840,
-  "port": 22065,
-  "token": "e7c646a5-95a5-40b4-8ecd-37fc9f9144ff",
-  "startedAt": "2026-05-11T22:38:46.731Z",
+  "pid": 20286,
+  "port": 43040,
+  "token": "3a88b221-22d3-4fe2-9062-184e75b5b822",
+  "startedAt": "2026-05-11T23:42:20.969Z",
   "serverPath": "/Users/oldfish/.agents/skills/gstack/browse/src/server.ts",
   "mode": "launched",
   "configHash": "303a7eeccc03078b"

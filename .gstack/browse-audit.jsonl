@@ -32,3 +32,45 @@
 {"ts":"2026-05-11T22:38:52.560Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":44,"status":"ok","hasCookies":false,"mode":"launched"}
 {"ts":"2026-05-11T22:38:58.321Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
 {"ts":"2026-05-11T22:39:03.310Z","cmd":"screenshot","args":"/tmp/logscope-test3.png","origin":"http://localhost:5000/","durationMs":109,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:42:56.861Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":281,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:01.822Z","cmd":"console","args":"--clear","origin":"http://localhost:5000/","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.790Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":271,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.826Z","cmd":"wait","args":"#mainBtn","origin":"http://localhost:5000/","durationMs":36,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.848Z","cmd":"snapshot","args":"-i","origin":"http://localhost:5000/","durationMs":22,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.870Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":22,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.873Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":1,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.873Z","cmd":"console","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.873Z","cmd":"network","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:34.873Z","cmd":"chain","args":"[\n  [\"goto\",\"http://localhost:5000\"],\n  [\"wait\",\"#mainBtn\"],\n  [\"snapshot\",\"-i\"],\n  [\"upload\",\"#fileInput\",\"/tmp/test-logs2.tar.gz\"],\n  [\"sleep\",\"2\"],\n  [\"text\"],\n  [\"console\"],\n  [\"network\"]\n]","origin":"http://localhost:5000/","durationMs":355,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:48.887Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":13,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T22:59:58.933Z","cmd":"wait","args":"--networkidle","origin":"http://localhost:5000/","durationMs":1,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:00:02.531Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":15,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:00:06.320Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:21.060Z","cmd":"console","args":"","origin":"about:blank","durationMs":1,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:21.099Z","cmd":"network","args":"","origin":"about:blank","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:30.779Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":164,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:31.283Z","cmd":"wait","args":"--networkidle","origin":"http://localhost:5000/","durationMs":459,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:31.393Z","cmd":"upload","args":"#fileInput /tmp/test-logs2.tar.gz","origin":"http://localhost:5000/","durationMs":47,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:38.819Z","cmd":"screenshot","args":"/tmp/round1.png","origin":"http://localhost:5000/","durationMs":110,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:38.853Z","cmd":"console","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:58.547Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:42:59.053Z","cmd":"wait","args":"--networkidle","origin":"http://localhost:5000/","durationMs":467,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:43:53.382Z","cmd":"click","args":"@e25","origin":"http://localhost:5000/","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e25 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-11T23:43:58.321Z","cmd":"click","args":"#clearBtn","origin":"http://localhost:5000/","durationMs":35020,"status":"error","hasCookies":false,"mode":"launched","error":"click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#clearBtn')\u001b[22m\n"}
+{"ts":"2026-05-11T23:45:22.079Z","cmd":"snapshot","args":"-i","origin":"http://localhost:5000/","durationMs":131,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:45:27.426Z","cmd":"upload","args":"#fileInput /tmp/test-single.log","origin":"http://localhost:5000/","durationMs":66,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:45:33.639Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:45:39.877Z","cmd":"console","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:45:39.910Z","cmd":"network","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:46:31.909Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":78,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:46:31.951Z","cmd":"console","args":"--clear","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-11T23:46:33.017Z","cmd":"console","args":"","origin":"http://localhost:5000/","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:10:36.668Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":328,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:10:41.517Z","cmd":"upload","args":"#fileInput ~/Documents/work/Atlas800(Model3000)_2102313NNLP0NC100035_20250723-0904.tar.gz","origin":"http://localhost:5000/","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"File not found: ~/Documents/work/Atlas800(Model3000)_2102313NNLP0NC100035_20250723-0904.tar.gz"}
+{"ts":"2026-05-12T00:10:46.010Z","cmd":"upload","args":"#fileInput /Users/oldfish/Documents/work/Atlas800(Model3000)_2102313NNLP0NC100035_20250723-0904.tar.gz","origin":"http://localhost:5000/","durationMs":3,"status":"error","hasCookies":false,"mode":"launched","error":"Path must be within: /private/tmp, /Users/oldfish/claudecode/backend"}
+{"ts":"2026-05-12T00:10:55.271Z","cmd":"goto","args":"http://localhost:5000","origin":"http://localhost:5000/","durationMs":20,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:10:55.361Z","cmd":"upload","args":"#fileInput /tmp/atlas800.tar.gz","origin":"http://localhost:5000/","durationMs":45,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:11:08.406Z","cmd":"screenshot","args":"/tmp/atlas1.png","origin":"http://localhost:5000/","durationMs":3037,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:11:08.451Z","cmd":"text","args":"","origin":"http://localhost:5000/","durationMs":6,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:11:27.571Z","cmd":"js","args":"document.getElementById('results').innerHTML = ''; document.getElementById('stats').scrollIntoView();","origin":"http://localhost:5000/","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-12T00:11:32.824Z","cmd":"screenshot","args":"/tmp/atlas2.png","origin":"http://localhost:5000/","durationMs":86,"status":"ok","hasCookies":false,"mode":"launched"}

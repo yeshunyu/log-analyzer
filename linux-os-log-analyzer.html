@@ -721,18 +721,33 @@ function renderPerFileResults(perFileResults) {
       </div>
     </div>`;
 
-  let html = '';
-  perFileResults.forEach(fr => {
-    html += `<div class="file-result-block">
-      <div class="file-result-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-        <span>${escapeHtml(fr.path)} <span class="badge">${fr.results.length} 条 / ${formatSize(fr.size)}</span></span>
-        <span style="font-size:0.8em;opacity:0.6;">▼</span>
-      </div>
-      <div class="file-result-body">`;
-    if (fr.results.length === 0) {
-      html += '<div class="file-result-empty">未检测到问题</div>';
-    } else {
-      html += fr.results.map(r => `
+  // 只显示有问题的文件，最多显示30个文件，每个文件最多10条结果
+  const MAX_FILES = 30;
+  const MAX_RESULTS_PER_FILE = 10;
+  const filesWithIssues = perFileResults.filter(fr => fr.results.length > 0);
+  const totalIssueFiles = filesWithIssues.length;
+  const shownFiles = filesWithIssues.slice(0, MAX_FILES);
+  const totalFiles = perFileResults.length;
+
+  let totalResultsShown = 0;
+  let html = `<div style="font-size:0.8em;color:var(--text-secondary);margin-bottom:10px;padding:6px 10px;background:var(--bg-tertiary);border-radius:6px;">
+    📁 共 ${totalFiles} 个文件，<span style="color:var(--warning);">${totalIssueFiles} 个有问题</span>
+    ${totalIssueFiles > MAX_FILES ? ' (显示前' + MAX_FILES + '个)' : ''}
+  </div>`;
+  if (shownFiles.length === 0) {
+    html += '<div style="color:var(--text-muted);font-size:0.9em;padding:20px;text-align:center;">未检测到问题模式</div>';
+  } else {
+    shownFiles.forEach(fr => {
+      const shownResults = fr.results.slice(0, MAX_RESULTS_PER_FILE);
+      const hiddenCount = fr.results.length - MAX_RESULTS_PER_FILE;
+      totalResultsShown += shownResults.length;
+      html += `<div class="file-result-block">
+        <div class="file-result-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+          <span>${escapeHtml(fr.path)} <span class="badge">${fr.results.length} 条</span></span>
+          <span style="font-size:0.8em;opacity:0.6;">▼</span>
+        </div>
+        <div class="file-result-body" style="display:none;">`;
+      html += shownResults.map(r => `
         <div class="issue-card ${r.severity}" style="margin:6px 0;">
           <div class="header">
             <span>${r.time ? `<span class="time">${escapeHtml(r.time)}</span> ` : ''}[${escapeHtml(r.category)}]</span>
@@ -741,9 +756,15 @@ function renderPerFileResults(perFileResults) {
           <div class="content">${escapeHtml(r.line)}</div>
           <div class="suggestion">${escapeHtml(r.suggestion)}</div>
         </div>`).join('');
+      if (hiddenCount > 0) {
+        html += `<div style="font-size:0.8em;color:var(--text-muted);padding:4px 0;">+ 还有 ${hiddenCount} 条结果</div>`;
+      }
+      html += '</div></div>';
+    });
+    if (totalIssueFiles > MAX_FILES) {
+      html += `<div style="text-align:center;font-size:0.8em;color:var(--text-muted);padding:10px;">还有 ${totalIssueFiles - MAX_FILES} 个文件的结果未显示</div>`;
     }
-    html += '</div></div>';
-  });
+  }
   document.getElementById('results').innerHTML = html;
 }
 
@@ -1124,12 +1145,17 @@ function loadHistory() {
       const count = document.getElementById('historyCount');
       if (data.history && data.history.length > 0) {
         section.style.display = 'block';
+        const shown = data.history.slice(0, 10); // 最多显示10个
         count.textContent = '(' + data.history.length + ')';
-        list.innerHTML = data.history.map(h => `
-          <div class="history-item" onclick="loadHistoryItem(${h.id})" style="cursor:pointer;display:inline-block;padding:4px 10px;margin:2px;background:var(--bg-tertiary);border-radius:16px;font-size:0.78em;color:var(--text-secondary);border:1px solid var(--border);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(h.filename)}">
-            ${escapeHtml(h.filename)}
-          </div>
-        `).join('');
+        list.innerHTML = shown.map(h => {
+          const name = h.filename.length > 22 ? h.filename.slice(0, 20) + '…' : h.filename;
+          return `<div class="history-item" onclick="loadHistoryItem(${h.id})" style="cursor:pointer;display:inline-block;padding:3px 8px;margin:2px;background:var(--bg-tertiary);border-radius:12px;font-size:0.72em;color:var(--text-secondary);border:1px solid var(--border);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(h.filename)}">
+            ${escapeHtml(name)}
+          </div>`;
+        }).join('');
+        if (data.history.length > 10) {
+          list.innerHTML += `<span style="font-size:0.72em;color:var(--text-muted);padding:3px 6px;">+${data.history.length - 10}</span>`;
+        }
       } else {
         section.style.display = 'none';
       }
@@ -1147,15 +1173,17 @@ function loadHistoryItem(id) {
         if (item.is_archive) {
           document.getElementById('logInput').style.display = 'none';
           document.getElementById('archivePanel').style.display = 'block';
-          document.getElementById('archiveDisplay').innerHTML = '<pre class="tree-view">' + escapeHtml(item.preview) + '</pre>';
+          document.getElementById('archiveDisplay').innerHTML = '<pre class="tree-view">' + escapeHtml(item.preview) + '</pre>\n<div style="color:var(--text-muted);font-size:0.8em;margin-top:8px;">📋 历史记录，请重新上传以进行分析</div>';
           currentArchive = item;
+          currentFiles = []; // 历史存档不含文件内容，需要重新上传
+          document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> — 需重新上传';
         } else {
           document.getElementById('archivePanel').style.display = 'block';
           document.getElementById('archiveDisplay').innerHTML = `<div style="margin-bottom:6px;color:var(--accent);font-weight:600;font-size:0.85em;">${escapeHtml(item.filename)}</div><pre class="tree-view" style="max-height:160px;">${escapeHtml(item.preview.slice(0, 2000))}</pre>`;
           document.getElementById('logInput').style.display = 'none';
           currentLogText = item.preview;
+          document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size || 0) + ')';
         }
-        document.getElementById('fileInfo').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> 历史: <strong>' + escapeHtml(item.filename) + '</strong> (' + formatSize(item.content_size || 0) + ')';
       }
     })
     .catch(() => {});
